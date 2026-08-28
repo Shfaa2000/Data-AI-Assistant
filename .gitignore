@@ -4,4 +4,6 @@ __pycache__/
 .env
 .vscode/
 tests/test.py
-data/processed/*.csv
+data/processed/*
+data/database.sqlite
+query_results.txt
