@@ -175,3 +175,24 @@ def get_story_view(rows: pd.DataFrame,n: int = 1) -> pd.DataFrame:
         .head(n)
         .T
     )
+
+def investigate_billed_cost_outliers(data: pd.DataFrame) -> dict:
+
+    top5 = data.nlargest(5, "BilledCost")[
+        ["ProviderName", "ServiceName", "BilledCost", "ChargeDescription"]
+    ]
+    stats = data["BilledCost"].describe()
+    skewness = data["BilledCost"].skew()
+
+    Q1, Q3 = data["BilledCost"].quantile([0.25, 0.75])
+    IQR = Q3 - Q1
+    lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+    outliers = data[(data["BilledCost"] < lower) | (data["BilledCost"] > upper)]
+
+    return {
+        "top5_highest": top5,
+        "descriptive_stats": stats,
+        "skewness": skewness,
+        "iqr_outlier_count": len(outliers),
+        "iqr_outliers_by_category": outliers["ServiceCategory"].value_counts(),
+    }
