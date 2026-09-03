@@ -1,75 +1,174 @@
-import pandas as pd
 import json
 from collections import Counter
+import pandas as pd
 
-def normalize_charge_frequency(series: pd.Series) -> pd.Series:
-    """توحيد صيغة ChargeFrequency (Usage-Based / Usage-based / One-Time) بصيغة واحدة."""
+
+def normalize_charge_frequency(
+    series: pd.Series,
+) -> pd.Series:
+    """توحيد صيغة ChargeFrequency."""
     return series.str.strip().str.title()
 
 
-def flag_unreliable_availability_zone(data: pd.DataFrame) -> pd.Series:
-    looks_numeric = data["AvailabilityZone"].astype(str).str.match(r'^-?\d')
+def flag_unreliable_availability_zone(
+    data: pd.DataFrame,
+) -> pd.Series:
+    """تحديد قيم AvailabilityZone الرقمية."""
+    looks_numeric = (
+        data["AvailabilityZone"]
+        .astype(str)
+        .str.match(r"^-?\d")
+    )
+
     return ~looks_numeric.fillna(False)
 
 
-def clean_billing_data(data: pd.DataFrame) -> pd.DataFrame:
-    """   تاخد البيانات الخام وترجع نسخة نظيفة، بدون فقدان أي عمود أصلي."""
-    clean = data.copy()
-    clean["ChargeFrequency_normalized"] = normalize_charge_frequency(clean["ChargeFrequency"])
-    clean["AvailabilityZone_valid"] = flag_unreliable_availability_zone(clean)
-    clean["BilledCost_outlier_adjusted"] = flag_billed_cost_outliers_adjusted(clean)
-    return clean
-
-
-def extract_normalized_tag_keys(tag_json) -> list:
-    """يرجع مفاتيح Tags بعد التطبيع (lowercase + strip) لصف واحد."""
+def extract_normalized_tag_keys(
+    tag_json,
+) -> list:
+    """استخراج مفاتيح Tags بعد التطبيع."""
     try:
         parsed = json.loads(tag_json)
-    except (TypeError, json.JSONDecodeError):
+
+    except (
+        TypeError,
+        json.JSONDecodeError,
+    ):
         return []
-    return [k.strip().lower() for k in parsed.keys()]
+
+    return [
+        key.strip().lower()
+        for key in parsed.keys()
+    ]
 
 
-def get_tag_key_frequency(data: pd.DataFrame) -> Counter:
-    """تكرار كل مفتاح Tag بعد التطبيع عبر كل الـdataset — للاستكشاف فقط، مو جزء من clean_billing_data."""
-    all_keys = data["Tags"].dropna().apply(extract_normalized_tag_keys)
-    return Counter(k for keys in all_keys for k in keys)
+def get_tag_key_frequency(
+    data: pd.DataFrame,
+) -> Counter:
+    """حساب تكرار مفاتيح Tags."""
+    all_keys = (
+        data["Tags"]
+        .dropna()
+        .apply(extract_normalized_tag_keys)
+    )
 
-def flag_billed_cost_outliers(data: pd.DataFrame) -> pd.Series:
-    """يعلّم الصفوف اللي BilledCost تبعها outlier بطريقة IQR — للمراجعة، مش للحذف."""
-    Q1, Q3 = data["BilledCost"].quantile([0.25, 0.75])
-    IQR = Q3 - Q1
-    lower, upper = Q1 - 1.5*IQR, Q3 + 1.5*IQR
-    return ~data["BilledCost"].between(lower, upper)
+    return Counter(
+        key
+        for keys in all_keys
+        for key in keys
+    )
 
 
-def flag_billed_cost_outliers_adjusted(data: pd.DataFrame) -> pd.Series:
+def flag_billed_cost_outliers(
+    data: pd.DataFrame,
+) -> pd.Series:
+    """تحديد BilledCost outliers باستخدام IQR."""
+    q1, q3 = data["BilledCost"].quantile(
+        [0.25, 0.75]
+    )
 
-    x = data["BilledCost"].values
+    iqr = q3 - q1
 
-    # 1) نلاقي نقطة المنتصف
-    med = pd.Series(x).median()
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
 
-    # 2) نقسم البيانات لمجموعتين حوالين المنتصف
-    xi = x[x <= med]   # تحت أو يساوي المنتصف
-    xj = x[x >= med]   # فوق أو يساوي المنتصف
+    return ~data["BilledCost"].between(
+        lower,
+        upper,
+    )
 
-    # 3) نحسب "قديش كل زوج بعيد بشكل غير متماثل عن المنتصف"
-    h_vals = [((j - med) - (med - i)) / (j - i) for i in xi for j in xj if i != j]
 
-    # 4) medcouple = الوسيط (median) لكل قيم h
-    mc = pd.Series(h_vals).median()
+def flag_billed_cost_outliers_adjusted(
+    data: pd.DataFrame,
+) -> pd.Series:
+    """تحديد BilledCost outliers باستخدام Adjusted Boxplot."""
+    values = data["BilledCost"].values
+    median = pd.Series(values).median()
 
-    # 5) نحسب IQR العادية
-    Q1, Q3 = data["BilledCost"].quantile([0.25, 0.75])
-    IQR = Q3 - Q1
+    lower_values = values[
+        values <= median
+    ]
 
-    # 6) نبني حدود غير متماثلة حسب اتجاه الالتواء (mc)
-    if mc >= 0:  # التواء ناحية اليمين (حالتنا بالضبط)
-        lower = Q1 - 1.5 * (2.718281828 ** (-4*mc)) * IQR
-        upper = Q3 + 1.5 * (2.718281828 ** (3*mc)) * IQR
-    else:        # التواء ناحية اليسار
-        lower = Q1 - 1.5 * (2.718281828 ** (-3*mc)) * IQR
-        upper = Q3 + 1.5 * (2.718281828 ** (4*mc)) * IQR
+    upper_values = values[
+        values >= median
+    ]
 
-    return ~data["BilledCost"].between(lower, upper)
+    h_values = [
+        ((upper - median) - (median - lower))
+        / (upper - lower)
+        for lower in lower_values
+        for upper in upper_values
+        if lower != upper
+    ]
+
+    medcouple = pd.Series(
+        h_values
+    ).median()
+
+    q1, q3 = data["BilledCost"].quantile(
+        [0.25, 0.75]
+    )
+
+    iqr = q3 - q1
+
+    if medcouple >= 0:
+        lower = (
+            q1
+            - 1.5
+            * (2.718281828 ** (-4 * medcouple))
+            * iqr
+        )
+
+        upper = (
+            q3
+            + 1.5
+            * (2.718281828 ** (3 * medcouple))
+            * iqr
+        )
+
+    else:
+        lower = (
+            q1
+            - 1.5
+            * (2.718281828 ** (-3 * medcouple))
+            * iqr
+        )
+
+        upper = (
+            q3
+            + 1.5
+            * (2.718281828 ** (4 * medcouple))
+            * iqr
+        )
+
+    return ~data["BilledCost"].between(
+        lower,
+        upper,
+    )
+
+
+def clean_billing_data(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
+    """إرجاع نسخة منظّمة دون حذف الصفوف."""
+    clean = data.copy()
+
+    clean["ChargeFrequency_normalized"] = (
+        normalize_charge_frequency(
+            clean["ChargeFrequency"]
+        )
+    )
+
+    clean["AvailabilityZone_valid"] = (
+        flag_unreliable_availability_zone(
+            clean
+        )
+    )
+
+    clean["BilledCost_outlier_adjusted"] = (
+        flag_billed_cost_outliers_adjusted(
+            clean
+        )
+    )
+
+    return clean

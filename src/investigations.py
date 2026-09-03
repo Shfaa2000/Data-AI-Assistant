@@ -1,6 +1,6 @@
 import pandas as pd
 
-# تحقيقات خاصة بمشكلة أو anomaly
+
 STORY_COLUMNS = [
     "ProviderName",
     "ServiceName",
@@ -17,7 +17,9 @@ STORY_COLUMNS = [
 ]
 
 
-def get_credit_rows(data: pd.DataFrame) -> pd.DataFrame:
+def get_credit_rows(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
     columns = [
         "ProviderName",
         "ServiceName",
@@ -36,10 +38,15 @@ def get_credit_rows(data: pd.DataFrame) -> pd.DataFrame:
         "SubAccountName",
     ]
 
-    return data.loc[data["ChargeCategory"] == "Credit",columns]
+    return data.loc[
+        data["ChargeCategory"] == "Credit",
+        columns,
+    ]
 
 
-def get_microsoft_negative_rows(data: pd.DataFrame) -> pd.DataFrame:
+def get_microsoft_negative_rows(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
     columns = [
         "ProviderName",
         "ServiceName",
@@ -61,14 +68,28 @@ def get_microsoft_negative_rows(data: pd.DataFrame) -> pd.DataFrame:
         "RegionName",
     ]
 
-    return data.loc[(data["ProviderName"] == "Microsoft")& (data["BilledCost"] < 0),columns]
+    mask = (
+        data["ProviderName"] == "Microsoft"
+    ) & (
+        data["BilledCost"] < 0
+    )
+
+    return data.loc[
+        mask,
+        columns,
+    ]
 
 
-def get_microsoft_negative_summary(data: pd.DataFrame) -> pd.DataFrame:
-    negative_rows = get_microsoft_negative_rows(data)
+def get_microsoft_negative_summary(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
+    negative_rows = (
+        get_microsoft_negative_rows(data)
+    )
 
     return (
-        negative_rows.groupby(
+        negative_rows
+        .groupby(
             [
                 "ServiceName",
                 "ServiceCategory",
@@ -76,18 +97,32 @@ def get_microsoft_negative_summary(data: pd.DataFrame) -> pd.DataFrame:
                 "ConsumedUnit",
             ],
             dropna=False,
-            as_index=False
+            as_index=False,
         )
         .agg(
-            RowCount=("BilledCost", "size"),
-            TotalBilledCost=("BilledCost", "sum"),
-            TotalEffectiveCost=("EffectiveCost", "sum"),
-            TotalConsumedQuantity=("ConsumedQuantity","sum"),
+            RowCount=(
+                "BilledCost",
+                "size",
+            ),
+            TotalBilledCost=(
+                "BilledCost",
+                "sum",
+            ),
+            TotalEffectiveCost=(
+                "EffectiveCost",
+                "sum",
+            ),
+            TotalConsumedQuantity=(
+                "ConsumedQuantity",
+                "sum",
+            ),
         )
     )
 
 
-def get_commitment_rows(data: pd.DataFrame) -> pd.DataFrame:
+def get_commitment_rows(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
     columns = [
         "ProviderName",
         "ServiceName",
@@ -108,33 +143,50 @@ def get_commitment_rows(data: pd.DataFrame) -> pd.DataFrame:
         "ListCost",
     ]
 
-    return data.loc[data["CommitmentDiscountId"].notna(),
-        columns
+    return data.loc[
+        data["CommitmentDiscountId"].notna(),
+        columns,
     ]
 
 
-def get_commitment_summary(data: pd.DataFrame) -> pd.DataFrame:
-    commitment_rows = get_commitment_rows(data)
+def get_commitment_summary(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
+    commitment_rows = (
+        get_commitment_rows(data)
+    )
 
     return (
-        commitment_rows.groupby(
+        commitment_rows
+        .groupby(
             [
                 "CommitmentDiscountId",
                 "CommitmentDiscountType",
                 "CommitmentDiscountStatus",
             ],
             dropna=False,
-            as_index=False
+            as_index=False,
         )
         .agg(
-            RowCount=("BilledCost", "size"),
-            TotalBilledCost=("BilledCost", "sum"),
-            TotalEffectiveCost=("EffectiveCost", "sum"),
+            RowCount=(
+                "BilledCost",
+                "size",
+            ),
+            TotalBilledCost=(
+                "BilledCost",
+                "sum",
+            ),
+            TotalEffectiveCost=(
+                "EffectiveCost",
+                "sum",
+            ),
         )
     )
 
 
-def get_red_hat_marketplace_rows(data: pd.DataFrame) -> pd.DataFrame:
+def get_red_hat_marketplace_rows(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
     columns = [
         "ProviderName",
         "PublisherName",
@@ -147,23 +199,37 @@ def get_red_hat_marketplace_rows(data: pd.DataFrame) -> pd.DataFrame:
         "EffectiveCost",
     ]
 
-    return data.loc[
-        data["PublisherName"].str.contains(
+    mask = (
+        data["PublisherName"]
+        .str.contains(
             "Red Hat",
             case=False,
-            na=False
-        ),
-        columns
-    ]
+            na=False,
+        )
+    )
 
-
-def get_oracle_adjustment_rows(data: pd.DataFrame) -> pd.DataFrame:
     return data.loc[
-        (data["ProviderName"] == "Oracle")
-        & (data["ChargeCategory"]== "Adjustment")
+        mask,
+        columns,
     ]
 
-def get_story_view(rows: pd.DataFrame,n: int = 1) -> pd.DataFrame:
+
+def get_oracle_adjustment_rows(
+    data: pd.DataFrame,
+) -> pd.DataFrame:
+    mask = (
+        data["ProviderName"] == "Oracle"
+    ) & (
+        data["ChargeCategory"] == "Adjustment"
+    )
+
+    return data.loc[mask]
+
+
+def get_story_view(
+    rows: pd.DataFrame,
+    n: int = 1,
+) -> pd.DataFrame:
     available_columns = [
         column
         for column in STORY_COLUMNS
@@ -176,23 +242,54 @@ def get_story_view(rows: pd.DataFrame,n: int = 1) -> pd.DataFrame:
         .T
     )
 
-def investigate_billed_cost_outliers(data: pd.DataFrame) -> dict:
 
-    top5 = data.nlargest(5, "BilledCost")[
-        ["ProviderName", "ServiceName", "BilledCost", "ChargeDescription"]
+def investigate_billed_cost_outliers(
+    data: pd.DataFrame,
+) -> dict:
+    top5 = data.nlargest(
+        5,
+        "BilledCost",
+    )[
+        [
+            "ProviderName",
+            "ServiceName",
+            "BilledCost",
+            "ChargeDescription",
+        ]
     ]
-    stats = data["BilledCost"].describe()
-    skewness = data["BilledCost"].skew()
 
-    Q1, Q3 = data["BilledCost"].quantile([0.25, 0.75])
-    IQR = Q3 - Q1
-    lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
-    outliers = data[(data["BilledCost"] < lower) | (data["BilledCost"] > upper)]
+    stats = (
+        data["BilledCost"]
+        .describe()
+    )
+
+    skewness = (
+        data["BilledCost"]
+        .skew()
+    )
+
+    q1, q3 = data[
+        "BilledCost"
+    ].quantile(
+        [0.25, 0.75]
+    )
+
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+
+    outliers = data[
+        (data["BilledCost"] < lower)
+        | (data["BilledCost"] > upper)
+    ]
 
     return {
         "top5_highest": top5,
         "descriptive_stats": stats,
         "skewness": skewness,
         "iqr_outlier_count": len(outliers),
-        "iqr_outliers_by_category": outliers["ServiceCategory"].value_counts(),
+        "iqr_outliers_by_category": (
+            outliers["ServiceCategory"]
+            .value_counts()
+        ),
     }
