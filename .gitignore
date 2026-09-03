@@ -1,9 +1,27 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local configuration and credentials
 .env
-.vscode/
-tests/test.py
-data/processed/*
+.env.*
+!.env.example
+*service-account*.json
+*credentials*.json
+
+# Generated runtime artifacts
 data/database.sqlite
-query_results.txt
+data/processed/*.csv
+data/processed/object_storage/
+reports/*
+docs/*
+*.log
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
