@@ -19,6 +19,7 @@ data/processed/object_storage/
 reports/*
 docs/*
 *.log
+/RUN_CLOUD_PIPELINE_CHANGES.md
 
 # Editors and OS
 .vscode/

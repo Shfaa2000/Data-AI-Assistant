@@ -309,12 +309,13 @@ def main():
 
             print("LOCAL_CHECK_SUCCESS")
             return
-
+        # يستدعي تابع تخزين ملف CSV المنظف.
         object_metadata = (
             store_cleaned_artifact()
         )
 
         manifest["phase"] = "OBJECT_READY"
+        # يحفظ Metadata داخل Manifest.
         manifest["object_storage"] = (
             object_metadata
         )
@@ -324,7 +325,7 @@ def main():
             metrics,
             object_metadata,
         )
-
+        #تخزين نتيجة Cloud داخل Manifest
         manifest["cloud_publish"] = (cloud_publish)
         manifest["published_table"] = (cloud_publish["published_table"])
 

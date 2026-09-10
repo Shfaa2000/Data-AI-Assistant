@@ -52,7 +52,7 @@ def main() -> int:
                 "Manifest published_table does not match config: "
                 f"{manifest['published_table']} != {published_table}"
             )
-
+        #  أنشئ اتصال BigQuery واحصل على Location الفعلية للـDataset.
         client = bigquery.Client(project=GCP_PROJECT_ID)
         dataset = client.get_dataset(
             f"{GCP_PROJECT_ID}.{BQ_DATASET_ID}"
@@ -88,7 +88,7 @@ def main() -> int:
             service=top_service["ServiceName"],
             currency=top_service["BillingCurrency"],
         )
-
+        # اجمع معرفات استعلامات BigQuery للحفاظ على قابلية التتبع.
         query_job_ids = [
             metrics_job_id,
             ranking.get("query_job_id"),

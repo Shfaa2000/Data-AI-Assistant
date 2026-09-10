@@ -1,3 +1,4 @@
+# يثبت أن Evidence المطابق يحدث latest، وأن Evidence الفاشل يُحفظ تاريخياً من دون استبدال آخر دليل موثوق.
 import json
 
 from src.evidence import (
@@ -6,7 +7,7 @@ from src.evidence import (
     write_evidence,
 )
 
-
+# أنشئ Manifest تجريبياً ناجحاً بقيم ثابتة.
 def make_manifest(row_count: int = 1000) -> dict:
     return {
         "run_id": "pipeline-run-test",

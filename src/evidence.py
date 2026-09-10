@@ -1,3 +1,4 @@
+# يعرّف عقد Evidence، يقرأ مقاييس الجدول المنشور، يطابقها مع Manifest، ويحفظ أحدث Evidence موثّق.
 import json
 import math
 from datetime import datetime, timezone
@@ -12,7 +13,8 @@ from src.config import EVIDENCE_DIR, LATEST_EVIDENCE_FILE
 
 
 class DatasetMetrics(BaseModel):
-    """Financial metrics calculated from the published BigQuery table."""
+    """عقد المقاييس المالية المحسوبة مباشرة من Published BigQuery Table.
+    يتحقق النموذج من أسماء الحقول وأنواعها وبعض القيود،"""
 
     row_count: int = Field(ge=0)
     billed_cost: float
@@ -36,7 +38,8 @@ class MetricCheck(BaseModel):
 
 
 class EvidenceBundle(BaseModel):
-    """One verified financial snapshot linked to one pipeline run."""
+    """ العقد الكامل للـEvidence Snapshot. يربط حقيقة مالية منشورة بتشغيل Pipeline محدد، ويحفظ
+    المقاييس، ونتائج المطابقة، وأعلى خدمة، وتفصيلها، ومعرفات استعلامات BigQuery، وحدود الاستنتاج."""
 
     schema_version: Literal["1.0"] = "1.0"
     evidence_id: str = Field(min_length=1)
@@ -70,7 +73,7 @@ SELECT
 FROM `{table_id}`
 """
 
-
+# اربط أسماء المقاييس داخل Manifest بأسمائها داخل DatasetMetrics.
 RECONCILIATION_FIELDS = {
     "row_count": "row_count",
     "billed_cost": "billed_cost",
@@ -92,6 +95,7 @@ def read_published_metrics(
         sql,
         location=location,
         job_config=bigquery.QueryJobConfig(
+            # يمنع الاستعلام من معالجة أكثر من 10 MiB.
             maximum_bytes_billed=10 * 1024 * 1024,
         ),
     )
@@ -170,13 +174,11 @@ def load_latest_successful_manifest(
 
     return latest_manifest
 
-
+# قارن المقاييس الحرجة بين Manifest المحلي وPublished BigQuery Table.
 def reconcile_metrics(
     local_metrics: dict,
     published_metrics: DatasetMetrics,
 ) -> list[MetricCheck]:
-    """Compare the five shared critical metrics."""
-
     checks = []
 
     for local_name, published_name in (
@@ -211,7 +213,7 @@ def reconcile_metrics(
 
     return checks
 
-
+# ابنِ Evidence Snapshot من المصادر التي جُمعت مسبقاً.
 def build_evidence(
     manifest: dict,
     published_metrics: DatasetMetrics,
@@ -219,7 +221,6 @@ def build_evidence(
     top_service: dict,
     service_breakdown: dict,
 ) -> EvidenceBundle:
-    """Build one evidence snapshot from reconciled sources."""
 
     checks = reconcile_metrics(
         manifest["local_metrics"],
@@ -283,6 +284,7 @@ def write_evidence(
         temporary_latest = latest_file.with_name(
             "latest.tmp.json"
         )
+        # يكتب ملفاً مؤقتاً أولاً ثم يستبدل latest. بذلك لا يترك latest.json ناقصاً إذا انقطع البرنامج أثناء الكتابة.
         temporary_latest.write_text(
             json_content,
             encoding="utf-8",

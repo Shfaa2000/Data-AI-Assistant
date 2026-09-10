@@ -1,6 +1,4 @@
 # ينفذ تحليلًا تفصيليًا لخدمة واحدة عند مزود وعملة محددين، ثم يجمع النتائج ويعيدها بصيغة مناسبة للـAPI.
-
-# يجمع الأرقام العشرية بدقة أفضل من sum العادية عند العمل مع عدة float.
 from math import fsum
 
 from google.cloud import bigquery
@@ -13,7 +11,7 @@ def read_service_breakdown(client, location, provider, service, currency):
     sql_path = BASE_DIR / "queries" / "bigquery" / "service_breakdown.sql"
     sql = sql_path.read_text(encoding="utf-8").format(source_table=source_table)
 
-    #    بلوك BigQuery قياسي. وظيفته منع Legacy SQL، حماية حد المعالجة، وإرسال المعاملات بأنواعها.
+    #    بلوك BigQuery . وظيفته منع Legacy SQL، حماية حد المعالجة، وإرسال المعاملات بأنواعها.
     job_config = bigquery.QueryJobConfig(
         use_legacy_sql=False,
         maximum_bytes_billed=10 * 1024 * 1024,

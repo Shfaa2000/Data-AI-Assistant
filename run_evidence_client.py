@@ -10,6 +10,7 @@ API_URL = "http://127.0.0.1:8000/finops/evidence/latest"
 def main() -> int:
     request = Request(
         API_URL,
+        # أنا كعميل أفضّل أن يعيد الخادم الاستجابة بصيغة JSON.
         headers={"Accept": "application/json"},
     )
 
@@ -18,16 +19,16 @@ def main() -> int:
             payload = json.loads(
                 response.read().decode("utf-8")
             )
-
+    # الخادم وصل إليه الطلب، لكنه أعاد حالة خطأ مثل 404 أو 422 أو 500.
     except HTTPError as error:
         body = error.read().decode("utf-8", errors="replace")
         print(f"API returned HTTP {error.code}: {body}")
         return 1
-
+    # لم يتمكن العميل من الوصول إلى الخادم، مثل أن FastAPI غير مشغلة.
     except URLError as error:
         print(f"Could not reach the API: {error.reason}")
         return 1
-
+    # وصلت استجابة، لكنها ليست JSON صالحاً.
     except json.JSONDecodeError as error:
         print(f"API returned invalid JSON: {error}")
         return 1
@@ -38,6 +39,7 @@ def main() -> int:
         check["status"] == "PASS" for check in checks
     )
     top_service = payload.get("top_service") or {}
+    # ادعم أكثر من تسمية محتملة للحقول، واستخدم N/A عند غياب القيمة.
     provider = (
         top_service.get("ProviderName")
         or top_service.get("provider")
