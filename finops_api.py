@@ -2,12 +2,12 @@
 import logging
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from google.api_core.exceptions import GoogleAPICallError
 from google.auth.exceptions import GoogleAuthError
 from google.cloud import bigquery
 from pydantic import ValidationError
-
+from google.genai import errors as genai_errors
 from run_finops_analytics import read_service_costs
 from src.config import (
     BQ_DATASET_ID,
@@ -17,7 +17,16 @@ from src.config import (
 from src.evidence import EvidenceBundle
 from src.service_breakdown import read_service_breakdown
 
-
+from src.narrative_api_dependencies import get_gemini_client
+from src.narrative_api_models import (
+    NarrativeRequest, NarrativeEnvelopeResponse
+)
+from src.narrative_service import (
+    generate_finops_narrative as generate_narrative_service,
+)
+from src.narrative_grounding import (
+    NarrativeGroundingError,
+)
 
 app = FastAPI(
     title="Data-AI Assistant",
@@ -25,8 +34,7 @@ app = FastAPI(
 )
 
 #     logger باسم الملف الحالي حتى تسجل الأخطاء مع مصدرها. تركيب قياسي.
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger("uvicorn.error")
 
 @app.get("/health")
 def health():
@@ -168,3 +176,98 @@ def service_breakdown(
     finally:
         if client is not None:
             client.close()
+
+@app.post(
+    "/v1/narratives",
+    response_model=NarrativeEnvelopeResponse,
+)
+def create_finops_narrative_endpoint(
+    request: NarrativeRequest,
+    gemini_client=Depends(get_gemini_client),
+):
+    """استقبال سؤال Narrative وإعادة Backend Envelope."""
+
+    try:
+        envelope, trace = generate_narrative_service(
+            client=gemini_client,
+            user_question=request.question,
+        )
+
+    except HTTPException:
+        raise
+
+    except ValidationError as exc:
+        logger.exception(
+            "Narrative response validation failed."
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Narrative provider returned "
+                "an invalid response."
+            ),
+        ) from exc
+
+    except FileNotFoundError as exc:
+        logger.exception(
+            "Verified evidence file was not found."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Verified evidence is "
+                "temporarily unavailable."
+            ),
+        ) from exc
+
+    except genai_errors.APIError as exc:
+        logger.exception(
+            "Gemini API request failed."
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Narrative provider is "
+                "temporarily unavailable."
+            ),
+        ) from exc
+
+    except NarrativeGroundingError as exc:
+        logger.exception(
+            "Narrative grounding validation failed."
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Narrative provider returned "
+                "an ungrounded response."
+            ),
+        ) from exc
+
+    except ValueError as exc:
+        logger.exception(
+            "Verified evidence failed validation."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Verified evidence is "
+                "temporarily unavailable."
+            ),
+        ) from exc
+
+    except Exception as exc:
+        logger.exception(
+            "Unexpected narrative generation error."
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected internal error.",
+        ) from exc
+
+    logger.info(
+        "Narrative safe trace: %s",
+        trace,
+    )
+
+    return envelope

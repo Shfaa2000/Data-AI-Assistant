@@ -18,6 +18,7 @@ data/processed/*.csv
 data/processed/object_storage/
 reports/*
 docs/*
+experiments/*
 *.log
 /RUN_CLOUD_PIPELINE_CHANGES.md
 
