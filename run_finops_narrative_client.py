@@ -31,7 +31,7 @@ def main() -> int:
 )
 
     try:
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=120) as response:
             http_status = response.status
             payload = json.loads(
             response.read().decode("utf-8")

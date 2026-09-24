@@ -5,3 +5,4 @@ fastapi
 uvicorn[standard]
 pydantic>=2
 pytest
+sqlglot==30.18.0
