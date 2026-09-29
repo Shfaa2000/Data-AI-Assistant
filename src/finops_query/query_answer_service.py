@@ -26,7 +26,7 @@ class QueryAnswerGenerationError(
     """يظهر إذا لم تعد Gemini جوابًا منظمًا صالحًا."""
 
 
-# ينفذ الاستدعاء الثالث ويتحقق من JSON ومن Grounding.
+# ينفذ الاستدعاء الثاني ويتحقق من JSON ومن Grounding.
 def generate_finops_answer(
     client: Any,
     evidence: DynamicQueryEvidence,

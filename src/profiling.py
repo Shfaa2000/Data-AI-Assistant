@@ -1,47 +1,106 @@
+"""طباعة وصف عام عن بيانات Cloud Billing."""
+
 import pandas as pd
 
 
-def profile_data(data: pd.DataFrame) -> None:
-    print("First five rows:")
-    print(data.head())
+def profile_data(
+    data: pd.DataFrame,
+) -> None:
 
-    print("\nShape:", data.shape)
-
-    print("\nColumns:")
-    print(data.columns.tolist())
-
-    print("\nData types:")
-    print(data.dtypes)
-
-    print("\nData info:")
-    data.info()
-
-    missing_counts = (
-        data.isna().sum().sort_values(ascending=False))
-    print("\nMissing values:")
-    print(missing_counts)
-
-    duplicate_count = data.duplicated().sum()
-    print("\nDuplicate rows:", duplicate_count)
-
-    provider_counts = (
-        data.groupby("ProviderName", dropna=False)
-        .size()
-        .reset_index(name="RowCount")
-        .sort_values("RowCount", ascending=False)
+    print("\n--- First Five Rows ---")
+    print(
+        data.head()
+        .to_string(index=False)
     )
 
-    print("\nProvider counts:")
-    print(provider_counts)
+    print("\n--- Dataset Shape ---")
+    print(
+        f"Rows: {len(data)}"
+    )
+    print(
+        f"Columns: {len(data.columns)}"
+    )
 
-    print("\nTotal BilledCost:",data["BilledCost"].sum())
+    print("\n--- Column Names ---")
+    print(data.columns.tolist())
 
-    print("\nTotal EffectiveCost:",data["EffectiveCost"].sum())
+    print("\n--- Data Types ---")
+    print(data.dtypes.to_string())
 
-    negative_count = (data["BilledCost"] < 0).sum()
-    zero_count = (data["BilledCost"] == 0).sum()
-    positive_count = (data["BilledCost"] > 0).sum()
+    print("\n--- DataFrame Info ---")
+    data.info()
 
-    print("\nNegative BilledCost values:",negative_count)
-    print("Zero BilledCost values:",zero_count)
-    print("Positive BilledCost values:",positive_count)
+    missing_values = (
+        data.isna()
+        .sum()
+        .sort_values(
+            ascending=False
+        )
+    )
+
+    print("\n--- Missing Values ---")
+    print(missing_values.to_string())
+
+    duplicate_count = int(
+        data.duplicated().sum()
+    )
+
+    print("\n--- Duplicate Rows ---")
+    print(duplicate_count)
+
+    provider_counts = (
+        data.groupby(
+            "ProviderName",
+            dropna=False,
+        )
+        .size()
+        .reset_index(
+            name="RowCount"
+        )
+        .sort_values(
+            "RowCount",
+            ascending=False,
+        )
+    )
+
+    print("\n--- Provider Row Counts ---")
+    print(
+        provider_counts
+        .to_string(index=False)
+    )
+
+    print("\n--- Financial Overview ---")
+
+    print(
+        "Total Billed Cost: "
+        f"{data['BilledCost'].sum()}"
+    )
+
+    print(
+        "Total Effective Cost: "
+        f"{data['EffectiveCost'].sum()}"
+    )
+
+    negative_count = int(
+        (data["BilledCost"] < 0).sum()
+    )
+
+    zero_count = int(
+        (data["BilledCost"] == 0).sum()
+    )
+
+    positive_count = int(
+        (data["BilledCost"] > 0).sum()
+    )
+
+    print(
+        f"Negative Billed Cost Rows: {negative_count}"
+    )
+
+    print(
+        f"Zero Billed Cost Rows: {zero_count}"
+    )
+
+    print(
+        f"Positive Billed Cost Rows: {positive_count}"
+    )

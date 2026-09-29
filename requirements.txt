@@ -1,6 +1,7 @@
 pandas>=2.2
 google-cloud-bigquery
-google-cloud-storage
+google-genai
+python-dotenv
 fastapi
 uvicorn[standard]
 pydantic>=2

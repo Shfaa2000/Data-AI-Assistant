@@ -66,6 +66,9 @@ GROUNDING RULES:
   decimal places using standard financial rounding.
 - Do not round row counts, limits, dates, or identifiers.
 - Do not otherwise transform or recalculate values.
+- For multi-row results, do not number the rows and do not use
+  numeric list labels such as 1, 2, or 3. Use plain sentences
+  or unnumbered bullet text so no new numbers are introduced.
 
 DYNAMIC_EVIDENCE:
 {evidence_json}

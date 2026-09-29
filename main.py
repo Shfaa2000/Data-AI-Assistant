@@ -1,29 +1,207 @@
-from src.analytics import get_analysis_results
-from src.cleaning import clean_billing_data
+"""تشغيل مسار البيانات المحلي من CSV إلى Cleaned CSV."""
+
+import pandas as pd
+
+from src.analytics import (
+    get_analysis_results,
+)
+from src.cleaning import (
+    clean_billing_data,
+)
 from src.config import (
     BILLING_FILE,
     CLEANED_BILLING_FILE,
 )
-from src.ingestion import load_data
+from src.ingestion import (
+    load_data,
+)
 from src.investigations import (
     investigate_billed_cost_outliers,
     investigate_billed_cost_outliers_by_service,
 )
+from src.profiling import (
+    profile_data,
+)
 from src.validation import (
     validate_analysis,
+    validate_cleaning_result,
     validate_required_columns,
 )
 
 
-def main():
-    data = load_data(BILLING_FILE)
+def print_section(
+    title: str,
+) -> None:
+    """طباعة عنوان واضح لكل مرحلة."""
 
-    validate_required_columns(data)
+    print(
+        f"\n{'=' * 70}"
+    )
 
-    clean_data = clean_billing_data(data)
+    print(title)
 
-    assert clean_data.shape[0] == data.shape[0], (
-        "لازم يبقى عدد الصفوف نفسه بعد التنظيف"
+    print(
+        f"{'=' * 70}"
+    )
+
+
+def run_data_pipeline() -> pd.DataFrame:
+    """تشغيل مسار البيانات المحلي وإعادة البيانات المنظفة."""
+
+    print_section(
+        "1. LOAD RAW DATA"
+    )
+
+    data = load_data(
+        BILLING_FILE
+    )
+
+    print(
+        f"Loaded rows: {len(data)}"
+    )
+
+    print(
+        f"Loaded columns: {len(data.columns)}"
+    )
+
+    print_section(
+        "2. VALIDATE INPUT DATA"
+    )
+
+    validate_required_columns(
+        data
+    )
+
+    print(
+        "Required columns validation: PASS"
+    )
+
+    print_section(
+        "3. PROFILE RAW DATA"
+    )
+
+    profile_data(
+        data
+    )
+
+    print_section(
+        "4. CLEAN DATA"
+    )
+
+    clean_data = clean_billing_data(
+        data
+    )
+
+    validate_cleaning_result(
+        source_data=data,
+        cleaned_data=clean_data,
+    )
+
+    added_columns = [
+        column
+        for column in clean_data.columns
+        if column not in data.columns
+    ]
+
+    print(
+        "Cleaning validation: PASS"
+    )
+
+    print(
+        f"Added columns: {added_columns}"
+    )
+
+    print_section(
+        "5. ANALYZE AND VALIDATE DATA"
+    )
+
+    analysis_results = (
+        get_analysis_results(
+            clean_data
+        )
+    )
+
+    provider_summary = (
+        analysis_results[
+            "Provider Summary"
+        ]
+    )
+
+    validate_analysis(
+        data=clean_data,
+        provider_summary=provider_summary,
+    )
+
+    print(
+        provider_summary
+        .to_string(index=False)
+    )
+
+    print(
+        "Analysis validation: PASS"
+    )
+
+    print_section(
+        "6. INVESTIGATE OUTLIERS"
+    )
+
+    general_outliers = (
+        investigate_billed_cost_outliers(
+            clean_data
+        )
+    )
+
+    print(
+        "--- Top Five Billed Cost Rows ---"
+    )
+
+    print(
+        general_outliers[
+            "top5_highest"
+        ]
+        .to_string(index=False)
+    )
+
+    print(
+        "\nBilled Cost Skewness: "
+        f"{general_outliers['skewness']}"
+    )
+
+    print(
+        "Global IQR Outlier Count: "
+        f"{general_outliers['iqr_outlier_count']}"
+    )
+
+    service_outliers = (
+        investigate_billed_cost_outliers_by_service(
+            clean_data
+        )
+    )
+
+    print(
+        "Service-Level Outlier Count: "
+        f"{service_outliers['outlier_count']}"
+    )
+
+    print(
+        "\n--- Service-Level Outlier Summary ---"
+    )
+
+    print(
+        service_outliers[
+            "summary"
+        ]
+        .head(15)
+        .to_string(index=False)
+    )
+
+    print_section(
+        "7. SAVE CLEANED DATA"
+    )
+
+    CLEANED_BILLING_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     clean_data.to_csv(
@@ -31,60 +209,27 @@ def main():
         index=False,
     )
 
-    outlier_report = (
-        investigate_billed_cost_outliers(
-            data
-        )
+    print(
+        "Cleaned CSV saved successfully."
     )
 
     print(
-        outlier_report["top5_highest"]
+        f"Output file: {CLEANED_BILLING_FILE}"
     )
 
     print(
-        f"Skewness: "
-        f"{outlier_report['skewness']}"
+        f"Saved rows: {len(clean_data)}"
     )
 
-    print(
-        "عدد outliers حسب IQR: "
-        f"{outlier_report['iqr_outlier_count']}"
+    print_section(
+        "DATA PIPELINE: PASS"
     )
 
-    service_outlier_report = (
-    investigate_billed_cost_outliers_by_service(
-        clean_data
-        )
-    )
+    return clean_data
 
-    print(
-        "\nعدد Outliers داخل كل Service: "
-        f"{service_outlier_report['outlier_count']}"
-    )
 
-    print(
-        service_outlier_report["summary"]
-        .head(15)
-        # لا تطبع عمود Index غير الضروري.
-        .to_string(index=False)
-    )
-
-    analysis_results = (
-        get_analysis_results(data)
-    )
-
-    provider_summary = (
-        analysis_results["Provider Summary"]
-    )
-
-    validate_analysis(
-        data,
-        provider_summary,
-    )
-
-    print(
-        "\nAll validation checks passed."
-    )
+def main() -> None:
+    run_data_pipeline()
 
 
 if __name__ == "__main__":

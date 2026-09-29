@@ -369,6 +369,93 @@ def _consume_plan_filter(
         f"{query_filter.value}"
     )
 
+# يطابق شرطي بداية الفترة الزمنية ونهايتها مع Query Plan.
+def _consume_time_range(
+    time_range: Any,
+    comparisons: list[exp.Expression],
+    consumed: set[int],
+    fields: Mapping[str, Any],
+    parameter_values: Mapping[str, Any],
+) -> None:
+    mapping = fields.get("time_range")
+
+    if mapping is None:
+        raise SqlSemanticValidationError(
+            "Time range is not present in schema context."
+        )
+
+    physical_column = str(
+        _read_value(
+            mapping,
+            "physical_column",
+        )
+    ).casefold()
+
+    boundaries = (
+        (
+            exp.GTE,
+            _read_value(time_range, "start"),
+            "start",
+        ),
+        (
+            exp.LTE,
+            _read_value(time_range, "end"),
+            "end",
+        ),
+    )
+
+    for (
+        operator_type,
+        expected_value,
+        boundary_name,
+    ) in boundaries:
+        for index, comparison in enumerate(
+            comparisons
+        ):
+            if index in consumed:
+                continue
+
+            if not isinstance(
+                comparison,
+                operator_type,
+            ):
+                continue
+
+            if not isinstance(
+                comparison.left,
+                exp.Column,
+            ):
+                continue
+
+            if (
+                comparison.left.name.casefold()
+                != physical_column
+            ):
+                continue
+
+            is_parameter, actual_value = (
+                _parameter_value(
+                    comparison.right,
+                    parameter_values,
+                )
+            )
+
+            if not is_parameter:
+                continue
+
+            # TIMESTAMP قد يحتوي وقتًا، لذلك نقارن جزء التاريخ.
+            if (
+                str(actual_value)[:10]
+                == str(expected_value)
+            ):
+                consumed.add(index)
+                break
+        else:
+            raise SqlSemanticValidationError(
+                "SQL does not implement the planned "
+                f"time range {boundary_name} boundary."
+            )
+
 # يتحقق أن القيمة الموجودة يمين المقارنة هي الصفر الرقمي.
 def _is_numeric_zero(
     expression: exp.Expression,
@@ -654,6 +741,14 @@ def validate_sql_semantics(
             fields,
             parameter_values,
         )
+        if plan.time_range is not None:
+            _consume_time_range(
+                plan.time_range,
+                comparisons,
+                consumed,
+                fields,
+                parameter_values,
+            )
 
     for metric in plan.metrics:
         semantic_name = _text(
@@ -683,11 +778,24 @@ def validate_sql_semantics(
                 consumed,
             )
 
-    if len(consumed) != len(comparisons):
-        raise SqlSemanticValidationError(
-            "SQL contains filters that were "
-            "not requested by Query Plan."
-        )
+        if len(consumed) != len(comparisons):
+            unexpected_comparisons = [
+                comparison.sql(
+                    dialect="bigquery"
+                )
+                for index, comparison in enumerate(
+                    comparisons
+                )
+                if index not in consumed
+            ]
+
+            raise SqlSemanticValidationError(
+                "SQL contains filters that were "
+                "not requested by Query Plan: "
+                f"{unexpected_comparisons}"
+            )
+
+        
 
     _validate_sort(
         plan,

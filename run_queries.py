@@ -1,3 +1,5 @@
+"""تشغيل استعلامات SQLite وحفظ نتائجها في تقرير واحد."""
+
 import sqlite3
 
 import pandas as pd
@@ -5,81 +7,98 @@ import pandas as pd
 from src.config import (
     DATABASE_FILE,
     QUERIES_DIR,
-    REPORTS_DIR,
+    QUERY_RESULTS_FILE,
 )
 
 
-query_results_file = (
-    REPORTS_DIR / "query_results.txt"
-)
+def run_queries():
 
-with sqlite3.connect(
-    DATABASE_FILE
-) as connection:
+    QUERY_RESULTS_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    with open(
-        query_results_file,
-        "w",
-        encoding="utf-8",
-    ) as output:
+    with sqlite3.connect(
+        DATABASE_FILE
+    ) as connection:
 
-        for filepath in sorted(
-            QUERIES_DIR.glob("*.sql")
-        ):
-            output.write(
-                f"\n{'=' * 70}\n"
-                f" queries/{filepath.name}\n"
-                f"{'=' * 70}\n"
+        with QUERY_RESULTS_FILE.open(
+            "w",
+            encoding="utf-8",
+        ) as output:
+
+            # قراءة ملفات SQL وفق ترتيب أسمائها.
+            query_files = sorted(
+                QUERIES_DIR.glob("*.sql")
             )
 
-            with open(
-                filepath,
-                encoding="utf-8",
-            ) as query_file:
-                raw_queries = query_file.read()
-
-            statements = [
-                statement.strip()
-                for statement in raw_queries.split(";")
-                if statement.strip()
-            ]
-
-            for statement in statements:
-                clean_lines = [
-                    line
-                    for line in statement.splitlines()
-                    if not line.strip().startswith("--")
-                ]
-
-                clean_statement = (
-                    "\n".join(clean_lines).strip()
-                )
-
-                if not clean_statement:
-                    continue
+            for query_file in query_files:
 
                 output.write(
-                    "\n--- "
-                    f"{clean_statement.splitlines()[0][:70]}"
-                    " ---\n"
+                    f"\n{'=' * 70}\n"
+                    f"queries/{query_file.name}\n"
+                    f"{'=' * 70}\n"
                 )
 
-                try:
-                    result = pd.read_sql(
-                        clean_statement,
+                raw_sql = query_file.read_text(
+                    encoding="utf-8"
+                )
+
+                statements = [
+                    statement.strip()
+                    for statement
+                    in raw_sql.split(";")
+                    if statement.strip()
+                ]
+
+                for statement in statements:
+
+                    clean_sql = "\n".join(
+                        line
+                        for line
+                        in statement.splitlines()
+                        if not line
+                        .strip()
+                        .startswith("--")
+                    ).strip()
+
+                    if not clean_sql:
+                        continue
+
+                    # تنفيذ الاستعلام على SQLite.
+                    result = pd.read_sql_query(
+                        clean_sql,
                         connection,
                     )
 
-                    output.write(
-                        str(result) + "\n"
+                    # استخدام أول سطر كعنوان مختصر للاستعلام.
+                    first_line = (
+                        clean_sql
+                        .splitlines()[0][:70]
                     )
 
-                except Exception as error:
                     output.write(
-                        f"Error: {error}\n"
+                        f"\n--- {first_line} ---\n"
                     )
 
-print(
-    f"تم حفظ النتائج في: "
-    f"{query_results_file}"
-)
+                    output.write(
+                        result.to_string(
+                            index=False
+                        )
+                    )
+
+                    output.write("\n")
+
+    print(
+        "SQL query report saved successfully."
+    )
+
+    print(
+        f"Report: {QUERY_RESULTS_FILE}"
+    )
+
+    return QUERY_RESULTS_FILE
+
+
+if __name__ == "__main__":
+    run_queries()

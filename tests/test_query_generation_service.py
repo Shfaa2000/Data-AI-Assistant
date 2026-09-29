@@ -9,17 +9,27 @@ from src.finops_query.query_catalog import (
     PhysicalTable,
     QuerySchemaCatalog,
 )
+
 from src.finops_query.query_generation_service import (
     generate_finops_query,
 )
+
 from src.finops_query.query_plan_validator import (
     QueryPlanValidationError,
 )
 
 
-PROJECT_ID = "data-ai-assistant-training"
-DATASET_ID = "cloud_finops"
-TABLE_ID = "billing_pipeline_day2"
+PROJECT_ID = (
+    "data-ai-assistant-training"
+)
+
+DATASET_ID = (
+    "cloud_finops"
+)
+
+TABLE_ID = (
+    "billing_pipeline_day2"
+)
 
 FULL_TABLE_ID = (
     f"{PROJECT_ID}."
@@ -29,7 +39,7 @@ FULL_TABLE_ID = (
 
 
 class FakeInteractions:
-    """يعيد استجابات محلية مرتبة دون Gemini."""
+    """يعيد استجابات محلية مرتبة دون استدعاء Gemini."""
 
     def __init__(
         self,
@@ -38,13 +48,18 @@ class FakeInteractions:
         self.output_texts = list(
             output_texts
         )
+
         self.requests = []
 
     def create(
         self,
         **kwargs,
     ):
-        self.requests.append(kwargs)
+        # حفظ بيانات الاستدعاء حتى نستطيع
+        # التأكد من عدد الاستدعاءات في الاختبار.
+        self.requests.append(
+            kwargs
+        )
 
         if not self.output_texts:
             raise AssertionError(
@@ -63,18 +78,22 @@ class FakeInteractions:
 
 
 class FakeGeminiClient:
-    """Client محلية لا تستهلك Gemini API."""
+    """Client وهمية لا تتصل بخدمة Gemini."""
 
     def __init__(
         self,
         output_texts: list[str],
     ):
-        self.interactions = FakeInteractions(
-            output_texts
+        self.interactions = (
+            FakeInteractions(
+                output_texts
+            )
         )
 
 
 def make_catalog() -> QuerySchemaCatalog:
+    """إنشاء Catalog تجريبي تستخدمه الاختبارات."""
+
     return QuerySchemaCatalog(
         tables=[
             PhysicalTable(
@@ -125,6 +144,8 @@ def make_catalog() -> QuerySchemaCatalog:
 
 
 def ready_plan_json() -> str:
+    """إعادة Query Plan جاهزة بصيغة JSON."""
+
     return json.dumps(
         {
             "status": "ready",
@@ -157,6 +178,8 @@ def ready_plan_json() -> str:
 
 
 def sql_proposal_json() -> str:
+    """إعادة SQL Proposal صالحة بصيغة JSON."""
+
     return json.dumps(
         {
             "sql": (
@@ -180,9 +203,13 @@ def sql_proposal_json() -> str:
 
 
 def clarification_plan_json() -> str:
+    """إعادة خطة تحتاج توضيحًا من المستخدم."""
+
     return json.dumps(
         {
-            "status": "needs_clarification",
+            "status": (
+                "needs_clarification"
+            ),
             "intent": (
                 "Clarify the requested provider."
             ),
@@ -202,6 +229,8 @@ def clarification_plan_json() -> str:
 
 
 def invalid_aggregation_plan_json() -> str:
+    """إعادة خطة تستخدم تجميعًا غير مسموح."""
+
     return json.dumps(
         {
             "status": "ready",
@@ -228,11 +257,67 @@ def invalid_aggregation_plan_json() -> str:
     )
 
 
+def generation_result_json() -> str:
+    """
+    إعادة نتيجة الاستدعاء الأول الجديدة.
+
+    تحتوي على Query Plan وSQL Proposal
+    داخل العقد نفسه.
+    """
+
+    return json.dumps(
+        {
+            "plan": json.loads(
+                ready_plan_json()
+            ),
+            "sql_proposal": json.loads(
+                sql_proposal_json()
+            ),
+        }
+    )
+
+
+def clarification_result_json() -> str:
+    """
+    إعادة نتيجة تحتاج توضيحًا.
+
+    لا يجوز أن تحتوي SQL Proposal.
+    """
+
+    return json.dumps(
+        {
+            "plan": json.loads(
+                clarification_plan_json()
+            ),
+            "sql_proposal": None,
+        }
+    )
+
+
+def invalid_aggregation_result_json() -> str:
+    """
+    إعادة عقد صحيح بنيويًا لكنه يحتوي
+    على تجميع غير مسموح دلاليًا.
+    """
+
+    return json.dumps(
+        {
+            "plan": json.loads(
+                invalid_aggregation_plan_json()
+            ),
+            "sql_proposal": json.loads(
+                sql_proposal_json()
+            ),
+        }
+    )
+
+
 def test_ready_plan_generates_sql_proposal():
+    """التأكد من إعادة الخطة وSQL باستدعاء واحد."""
+
     client = FakeGeminiClient(
         [
-            ready_plan_json(),
-            sql_proposal_json(),
+            generation_result_json()
         ]
     )
 
@@ -246,32 +331,35 @@ def test_ready_plan_generates_sql_proposal():
         full_table_id=FULL_TABLE_ID,
     )
 
-    assert result.plan.status.value == "ready"
-    assert result.sql_proposal is not None
+    assert (
+        result.plan.status.value
+        == "ready"
+    )
+
+    assert (
+        result.sql_proposal
+        is not None
+    )
+
     assert (
         "@provider"
         in result.sql_proposal.sql
     )
+
+    # الخطة وSQL أصبحتا في استدعاء واحد.
     assert (
-        len(client.interactions.requests)
-        == 2
+        len(
+            client.interactions.requests
+        )
+        == 1
     )
 
-    first_request = (
+    request = (
         client.interactions.requests[0]
     )
-    second_request = (
-        client.interactions.requests[1]
-    )
 
     assert (
-        first_request["response_format"][
-            "mime_type"
-        ]
-        == "application/json"
-    )
-    assert (
-        second_request["response_format"][
+        request["response_format"][
             "mime_type"
         ]
         == "application/json"
@@ -279,8 +367,15 @@ def test_ready_plan_generates_sql_proposal():
 
 
 def test_clarification_stops_before_sql():
+    """
+    التأكد من توقف السؤال غير الواضح
+    دون SQL Proposal.
+    """
+
     client = FakeGeminiClient(
-        [clarification_plan_json()]
+        [
+            clarification_result_json()
+        ]
     )
 
     result = generate_finops_query(
@@ -296,16 +391,30 @@ def test_clarification_stops_before_sql():
         result.plan.status.value
         == "needs_clarification"
     )
-    assert result.sql_proposal is None
+
     assert (
-        len(client.interactions.requests)
+        result.sql_proposal
+        is None
+    )
+
+    assert (
+        len(
+            client.interactions.requests
+        )
         == 1
     )
 
 
 def test_invalid_plan_stops_before_sql():
+    """
+    التأكد من رفض الخطة إذا استخدمت
+    عملية تجميع غير مسموحة.
+    """
+
     client = FakeGeminiClient(
-        [invalid_aggregation_plan_json()]
+        [
+            invalid_aggregation_result_json()
+        ]
     )
 
     with pytest.raises(
@@ -322,17 +431,25 @@ def test_invalid_plan_stops_before_sql():
         )
 
     assert (
-        len(client.interactions.requests)
+        len(
+            client.interactions.requests
+        )
         == 1
     )
 
 
 def test_invalid_plan_json_is_rejected():
+    """التأكد من رفض نص لا يمثل JSON صالحًا."""
+
     client = FakeGeminiClient(
-        ["This is not valid JSON."]
+        [
+            "This is not valid JSON."
+        ]
     )
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(
+        ValidationError
+    ):
         generate_finops_query(
             client=client,
             user_question=(

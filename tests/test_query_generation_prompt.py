@@ -1,18 +1,8 @@
 import pytest
 
 from src.finops_query.query_generation_prompt import (
-    build_query_plan_prompt,
-    build_sql_generation_prompt,
+    build_query_generation_prompt,
     normalize_user_question,
-)
-from src.finops_query.query_plan import (
-    FinOpsQueryPlan,
-    MetricSelection,
-    QueryStatus,
-)
-from src.finops_query.query_schema import (
-    AggregationName,
-    MetricName,
 )
 
 
@@ -29,25 +19,12 @@ SCHEMA_CONTEXT = {
             "physical_column": "BilledCost",
             "data_type": "FLOAT64",
             "allowed_aggregations": [
-                "sum",
+                "sum"
             ],
             "value_scope": "all_values",
         }
     ],
 }
-
-
-def make_ready_plan() -> FinOpsQueryPlan:
-    return FinOpsQueryPlan(
-        status=QueryStatus.READY,
-        intent="Calculate total billed cost.",
-        metrics=[
-            MetricSelection(
-                name=MetricName.BILLED_COST,
-                aggregation=AggregationName.SUM,
-            )
-        ],
-    )
 
 
 def test_normalizes_user_question():
@@ -68,8 +45,8 @@ def test_rejects_empty_question():
         normalize_user_question("   ")
 
 
-def test_plan_prompt_contains_question_and_schema():
-    prompt = build_query_plan_prompt(
+def test_generation_prompt_contains_question_and_schema():
+    prompt = build_query_generation_prompt(
         user_question=(
             "What is the total billed cost?"
         ),
@@ -80,35 +57,17 @@ def test_plan_prompt_contains_question_and_schema():
         "What is the total billed cost?"
         in prompt
     )
+
     assert "billed_cost" in prompt
-    assert "Do not generate SQL" in prompt
+    assert "Query Plan" in prompt
+    assert "SQL Proposal" in prompt
 
-
-def test_sql_prompt_contains_validated_plan():
-    prompt = build_sql_generation_prompt(
-        plan=make_ready_plan(),
-        schema_context=SCHEMA_CONTEXT,
+    assert (
+        "exactly one GoogleSQL SELECT"
+        in prompt
     )
 
-    assert "VALIDATED_QUERY_PLAN" in prompt
-    assert "BilledCost" in prompt
-    assert "exactly one SELECT" in prompt
-
-
-def test_sql_prompt_rejects_non_ready_plan():
-    plan = FinOpsQueryPlan(
-        status=QueryStatus.UNSUPPORTED,
-        intent="Forecast future cost.",
-        unsupported_reason=(
-            "Forecasting is not supported."
-        ),
+    assert (
+        "sql_proposal as null"
+        in prompt
     )
-
-    with pytest.raises(
-        ValueError,
-        match="requires a ready",
-    ):
-        build_sql_generation_prompt(
-            plan=plan,
-            schema_context=SCHEMA_CONTEXT,
-        )

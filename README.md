@@ -1,376 +1,362 @@
-# Data-AI Assistant
+# Data-AI Assistant — FinOps MVP
 
-A training project for building a reliable and explainable Data-AI Assistant using synthetic multi-cloud billing data.
+A beginner-friendly Data and AI assistant for cloud billing analysis.
 
-The current version implements local data ingestion, validation, cleaning, SQLite analytics, BigQuery publishing, reusable FinOps SQL analysis, Trusted Evidence generation, FastAPI endpoints, HTTP clients, and automated tests.
+The project has two clear paths:
 
-LLM and RAG integration remain future milestones.
+1. A data pipeline that validates, cleans, profiles, stores, and publishes billing data.
+2. A FinOps assistant that accepts an English question through a CLI or FastAPI endpoint, generates safe GoogleSQL with Gemini, executes it in BigQuery, and returns an evidence-grounded English answer.
 
-## Project Goal
+## Project Status
 
-The project builds a reusable pipeline that can:
+The current MVP supports:
 
-- Load cloud billing data.
-- Validate the dataset structure.
-- Clean and normalize selected fields.
-- Profile data quality.
-- Investigate unusual billing records.
-- Store and query data locally using SQLite.
-- Load validated data into BigQuery staging.
-- Reconcile local and cloud financial metrics.
-- Publish verified data to a BigQuery table.
-- Run reusable FinOps SQL analytics.
-- Build a trusted Evidence JSON snapshot.
-- Expose analytical results through FastAPI.
-- Prepare verified data for future LLM and RAG integration.
+- A local and BigQuery data pipeline.
+- Gemini-generated Query Plans and SQL Proposals.
+- Two Gemini calls per answered question.
+- Local validation before BigQuery execution.
+- BigQuery Dry Run and configurable execution limits.
+- Result validation and Dynamic Evidence generation.
+- Evidence-grounded final answers.
+- CLI and FastAPI interfaces using the same Assistant Core.
+- Automated tests for the data and FinOps query paths.
 
-## Dataset
+RAG over documents is not part of this version and can be added as a later project path.
 
-The project uses:
+## Architecture
 
-`focus_cloud_billing_sample_1000.csv`
-
-The dataset contains 1,000 synthetic cloud billing charge lines from:
-
-- AWS
-- Microsoft
-- Oracle
-
-The dataset is used only for training and development.
-
-## Current Architecture
+### 1. Data Pipeline
 
 ```text
 Raw CSV
-    ↓
-Pandas Ingestion
-    ↓
-Validation
-    ↓
-Cleaning
-    ↓
-Cleaned CSV
-    ↓
-Local Object Landing Zone
-    ↓
-BigQuery Staging
-    ↓
-Financial Reconciliation
-    ↓
-Published BigQuery Table
-    ↓
-SQL Views and FinOps Analytics
-    ↓
-Trusted Evidence JSON
-    ↓
-FastAPI
-    ↓
-HTTP Clients
+  -> Ingestion
+  -> Validation
+  -> Cleaning
+  -> Profiling and Investigations
+  -> Cleaned CSV
+  -> SQLite Reconciliation
+  -> BigQuery Staging
+  -> BigQuery Reconciliation
+  -> Published BigQuery Table
+  -> Pipeline Manifest
 ```
 
-## Key Project Structure
+The data path can run locally for safe verification or publish the cleaned dataset to BigQuery.
+
+### 2. FinOps Assistant
 
 ```text
-Data-AI-Assistant/
-│
-├── main.py
-├── run_cloud_pipeline.py
-├── run_finops_analytics.py
-├── run_finops_client.py
-├── run_finops_evidence.py
-├── run_evidence_client.py
-├── run_with_log.py
-├── finops_api.py
-│
+User Question (CLI or FastAPI)
+  -> Assistant Core
+  -> BigQuery Schema Catalog
+  -> Gemini Call 1: Query Plan + SQL Proposal
+  -> Query Plan, SQL Safety, and Semantic Validation
+  -> BigQuery Dry Run
+  -> Optional BigQuery Execution
+  -> Query Result Validation
+  -> Dynamic Evidence
+  -> Gemini Call 2: Final English Answer
+  -> Final Answer Validation
+  -> CLI or API Response
+```
+
+Gemini proposes the query and writes the final response. The backend owns validation, execution decisions, BigQuery access, and financial evidence.
+
+## Why Two Gemini Calls?
+
+The assistant originally used three Gemini calls:
+
+1. Generate a Query Plan.
+2. Generate an SQL Proposal.
+3. Generate the final answer.
+
+The first two stages are now combined. Gemini Call 1 returns both the Query Plan and SQL Proposal in one structured response. The backend still validates both contracts before BigQuery is contacted.
+
+Gemini Call 2 receives only validated Dynamic Evidence and produces the final English answer.
+
+This reduces model usage while keeping the important validation boundaries.
+
+## Supported Query Capabilities
+
+### Metrics
+
+- `billed_cost`
+- `effective_cost`
+- `negative_billed_cost`
+
+### Dimensions
+
+- `provider`
+- `service`
+- `currency`
+
+### Operations
+
+- Sum, average, minimum, and maximum for supported metrics.
+- Dimension filters and supported comparison operators.
+- Date ranges.
+- Grouping by supported dimensions.
+- Ascending and descending sorting.
+- Result limits.
+- Clarification and unsupported-question states.
+
+The MVP supports a defined semantic scope. It does not claim to answer every possible natural-language or financial question.
+
+## Safety and Grounding
+
+Before execution, the backend checks that the generated SQL:
+
+- Contains exactly one read-only `SELECT` statement.
+- Uses the allowed BigQuery table and physical columns.
+- Does not use DML, DDL, joins, subqueries, CTEs, window functions, or `SELECT *`.
+- Uses named parameters for user-provided values.
+- Matches the validated Query Plan.
+- Stays within the configured BigQuery byte limit.
+
+After execution, the backend checks that:
+
+- Returned columns match the Query Plan.
+- Row counts and values satisfy the result contract.
+- Dynamic Evidence contains the verified query result.
+- The final answer references real evidence rows and columns.
+- Financial numbers in the answer are present in the evidence or are permitted rounded representations.
+
+## Project Structure
+
+```text
+.
 ├── data/
-│   ├── raw/
-│   └── processed/
-│
+│   └── raw/
 ├── queries/
 │   └── bigquery/
-│       ├── billing_period_distribution.sql
-│       ├── provider_cost_ladder.sql
-│       ├── service_breakdown.sql
-│       ├── service_cost_ranking.sql
-│       ├── temporal_coverage.sql
-│       └── v_service_costs.sql
-│
 ├── src/
-│   ├── __init__.py
 │   ├── analytics.py
 │   ├── cleaning.py
 │   ├── config.py
 │   ├── database.py
-│   ├── evidence.py
 │   ├── ingestion.py
 │   ├── investigations.py
-│   ├── object_storage.py
 │   ├── pipeline_manifest.py
-│   ├── service_breakdown.py
-│   └── validation.py
-│
+│   ├── profiling.py
+│   ├── validation.py
+│   └── finops_query/
 ├── tests/
-│   └── test_evidence.py
-│
-├── .gitignore
+├── finops_api.py
+├── main.py
+├── run_cloud_pipeline.py
+├── run_finops_query_generation_live.py
+├── run_queries.py
 ├── .env.example
-├── requirements.txt
-└── README.md
+└── requirements.txt
 ```
 
-The `reports/` directory is generated locally at runtime and is intentionally excluded from Git.
+## Requirements
 
-## Google Cloud Resources
-
-The current training environment uses:
-
-- Project: `data-ai-assistant-training`
-- Dataset: `cloud_finops`
-- Reference table: `billing_cleaned`
-- Staging table: `billing_staging`
-- Published table: `billing_pipeline_day2`
-- Analytical view: `v_service_costs`
-- BigQuery location: `US`
-
-## Data Quality Controls
-
-The pipeline includes checks for:
-
-- Required columns.
-- Column order and reference schema compatibility.
-- Missing and completely empty fields.
-- Negative billed-cost records.
-- Zero-cost records.
-- Date-field compatibility.
-- Resource-field completeness.
-- Charge-frequency normalization.
-- Availability-zone validity.
-- Outlier investigation.
-- Financial reconciliation before publishing.
-
-The staging table is validated before the published table is updated.
-
-## Financial Reconciliation
-
-The pipeline compares these critical metrics:
-
-- Row count.
-- Billed cost.
-- Effective cost.
-- Negative row count.
-- Zero-cost row count.
-
-The final recorded Evidence reconciliation completed with:
-
-```text
-RECONCILIATION_CHECKS: 5/5 PASS
-EVIDENCE_STATUS: VERIFIED
-```
-
-Aggregate reconciliation verifies the recorded totals, but it does not replace complete row-level reconciliation.
-
-## FinOps Analytics
-
-The SQL analytics currently support:
-
-- Provider cost summaries.
-- Cost-layer comparisons.
-- Temporal coverage.
-- Billing-period distribution.
-- Service-cost ranking.
-- Positive and negative billed-cost separation.
-- Service-category and charge-category breakdowns.
-
-The current sample shows that Amazon Elastic Compute Cloud is the highest positive-cost service.
-
-Its recorded breakdown includes:
-
-- Compute / Usage.
-- Storage / Usage.
-- Compute / Credit.
-
-These results identify investigation priorities but do not independently prove waste, optimization opportunities, or root causes.
-
-## Trusted Evidence
-
-The project builds a versioned Evidence JSON bundle from:
-
-- The latest successful pipeline manifest.
-- The published BigQuery table.
-- Reconciled financial metrics.
-- The highest-cost service.
-- The selected service breakdown.
-- BigQuery query job IDs.
-- Explicit analytical limitations.
-
-Each Evidence bundle receives a unique Evidence ID.
-
-A historical Evidence file is always retained, while `latest.json` is updated only when all reconciliation checks pass and the Evidence status is `VERIFIED`.
-
-## API Endpoints
-
-The FastAPI application provides:
-
-- `GET /health`
-- `GET /finops/services`
-- `GET /finops/service-breakdown`
-- `GET /finops/evidence/latest`
-
-Swagger documentation is available while the API is running:
-
-`http://127.0.0.1:8000/docs`
+- Python 3.11 or later is recommended.
+- A Google Cloud project with BigQuery enabled.
+- Google Application Default Credentials or an equivalent configured BigQuery credential.
+- A Gemini API key.
 
 ## Installation
 
 Create and activate a virtual environment:
 
-```powershell
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```
+
+Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+macOS or Linux:
+
+```bash
+source .venv/bin/activate
 ```
 
 Install the dependencies:
 
-```powershell
+```bash
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-The project currently uses Google Application Default Credentials to access BigQuery.
+Copy the environment template on Windows:
 
-## Run the Local Analysis
+```bash
+copy .env.example .env
+```
 
-```powershell
+On macOS or Linux:
+
+```bash
+cp .env.example .env
+```
+
+Add the real Gemini key only to `.env`. Never commit `.env` or credential files.
+
+## Environment Variables
+
+| Variable | Purpose | Example |
+|---|---|---|
+| `GEMINI_API_KEY` | Gemini API key | Keep secret |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID | `data-ai-assistant-training` |
+| `FINOPS_DATASET_ID` | BigQuery dataset | `cloud_finops` |
+| `FINOPS_TABLE_ID` | Published billing table | `billing_pipeline_day2` |
+| `BIGQUERY_LOCATION` | BigQuery location | `US` |
+| `GEMINI_MODEL` | Gemini model name | `gemini-3.5-flash-lite` |
+| `FINOPS_EXECUTE_QUERIES` | Enables real query execution | `false` or `true` |
+| `FINOPS_MAXIMUM_BYTES_BILLED` | Maximum bytes allowed per query | `104857600` |
+| `FINOPS_MAX_RESULT_ROWS` | Maximum rows accepted by the backend | `100` |
+| `FINOPS_QUERY_TIMEOUT_SECONDS` | BigQuery execution timeout | `60` |
+
+Keep `FINOPS_EXECUTE_QUERIES=false` when testing query generation and Dry Run only.
+
+Change it to `true` only when real BigQuery execution is intended.
+
+## Running the Data Pipeline
+
+Run the local data preparation path:
+
+```bash
 python main.py
 ```
 
-## Run the Cloud Pipeline
+Run the cloud pipeline without publishing to BigQuery:
 
-Run local validation only:
-
-```powershell
+```bash
 python run_cloud_pipeline.py --local-only
 ```
 
-Run the complete BigQuery pipeline:
+Run the cloud pipeline and publish to BigQuery:
 
-```powershell
+```bash
 python run_cloud_pipeline.py
 ```
 
-The complete pipeline performs:
+Run the analytical SQL files:
 
-1. Local ingestion and validation.
-2. Cleaning.
-3. SQLite reconciliation.
-4. Local object-storage registration.
-5. BigQuery staging load.
-6. Staging reconciliation.
-7. Published-table update.
-8. Pipeline Manifest generation.
-
-## Run FinOps Analytics
-
-Create or verify the analytical view when required:
-
-```powershell
-python run_finops_analytics.py --create-view
+```bash
+python run_queries.py
 ```
 
-Run the service-cost analysis:
+## Running the FinOps Assistant from the CLI
 
-```powershell
-python run_finops_analytics.py
-```
-
-## Build Trusted Evidence
-
-```powershell
-python run_finops_evidence.py
-```
-
-A successful execution should return:
+Set this value in `.env` when real execution is required:
 
 ```text
-EVIDENCE_STATUS: VERIFIED
-RECONCILIATION_CHECKS: 5/5 PASS
+FINOPS_EXECUTE_QUERIES=true
 ```
 
-## Run the API
+Start the CLI:
 
-```powershell
+```bash
+python run_finops_query_generation_live.py
+```
+
+Then enter an English financial question.
+
+Example:
+
+```text
+What are the top 5 services by billed cost for AWS?
+```
+
+## Running the FastAPI Interface
+
+Start the API:
+
+```bash
 python -m uvicorn finops_api:app --reload
 ```
 
-Keep this terminal running.
+Open the interactive documentation:
 
-## Run the HTTP Clients
-
-In another terminal, run the service-breakdown client:
-
-```powershell
-python run_finops_client.py
+```text
+http://127.0.0.1:8000/docs
 ```
 
-Run the Evidence client:
+Available endpoints:
 
-```powershell
-python run_evidence_client.py
+- `GET /health`
+- `POST /finops/query`
+
+Example request:
+
+```json
+{
+  "question": "What are the top 5 services by billed cost for AWS?"
+}
 ```
 
-## Run the Tests
+The CLI and FastAPI paths both call the same Assistant Core, so the business logic is not duplicated.
 
-```powershell
+## Example Questions
+
+```text
+What is the total billed cost for AWS?
+```
+
+```text
+What are the top 5 services by billed cost for AWS?
+```
+
+```text
+What is the total effective cost for Microsoft?
+```
+
+```text
+What is the negative billed cost for Microsoft?
+```
+
+```text
+What was the total billed cost for AWS from September 1, 2024 to September 30, 2024?
+```
+
+## Running the Tests
+
+Run the complete test suite:
+
+```bash
 python -m pytest -q
 ```
 
-The tests cover:
+The tests use controlled test doubles where needed and do not require every test to call the real Gemini or BigQuery services.
 
-- Data validation.
-- Financial reconciliation.
-- Verified Evidence generation.
-- Failed Evidence protection.
-- API success and failure behavior.
+## Main BigQuery Resources
 
-## Cloud Storage Limitation
-
-A real Google Cloud Storage bucket could not be created because Billing is disabled and an eligible online payment method is unavailable in the current environment.
-
-The project therefore uses a local content-addressed object-storage backend based on SHA-256.
-
-The local backend provides:
-
-- Deterministic object identity.
-- Duplicate-storage prevention.
-- Stored-versus-reused tracking.
-- A structured landing-zone path.
-
-BigQuery staging, reconciliation, publishing, analytics, and Evidence generation remain operational.
-
-The local storage backend can later be replaced with Google Cloud Storage without redesigning the complete analytical flow.
+- Project: `data-ai-assistant-training`
+- Dataset: `cloud_finops`
+- Location: `US`
+- Schema reference table: `billing_cleaned`
+- Staging table: `billing_staging`
+- Published table: `billing_pipeline_day2`
 
 ## Current Limitations
 
-- The dataset is synthetic and contains only 1,000 rows.
-- The provider distribution is highly imbalanced.
-- The available periods do not support a reliable monthly trend.
-- The project currently uses user-based Application Default Credentials instead of a service account.
-- Google Cloud Storage is represented by a local fallback, not a real bucket.
-- Aggregate reconciliation does not prove complete row-by-row equality.
-- The causes of Microsoft negative Usage records are not fully proven.
-- The AWS billed-versus-effective cost gap requires additional source documentation.
-- The Evidence bundle does not provide forecasting.
-- The Evidence bundle does not prove resource-level root causes.
-- LLM and RAG integration have not been implemented yet.
+- The assistant supports the declared FinOps semantic schema only.
+- Complex joins, subqueries, CTEs, and window functions are outside the MVP SQL subset.
+- Questions requiring unavailable fields or unsupported business logic return an unsupported or clarification state.
+- Model quotas and BigQuery permissions depend on the configured Google accounts and services.
+- RAG and document-question routing are planned future paths, not current features.
 
-## Future Milestones
+## Dataset Note
 
-Planned milestones include:
+The repository uses a small synthetic billing dataset for training and demonstration.
 
-- Replacing the local landing zone with Google Cloud Storage.
-- Using a dedicated service account.
-- Adding row-level reconciliation.
-- Expanding temporal and monthly analysis.
-- Adding an LLM explanation layer.
-- Grounding LLM answers in verified Evidence.
-- Adding RAG for project documentation and analytical context.
-- Building a small user-facing assistant.
+It contains 1,000 rows across AWS, Microsoft, and Oracle examples and must not be treated as production financial data.
+
+## Repository Safety
+
+Do not commit:
+
+- `.env`
+- API keys
+- Google Cloud credential JSON files
+- Local databases
+- Generated runtime artifacts unless intentionally required for documentation
+
+Commit `.env.example` only, with placeholder or non-secret values.

@@ -1,5 +1,4 @@
-"""يعرّف العقد المنظم لـGoogleSQL والـParameters التي تقترحها Gemini بعد قبول Query Plan."""
-
+"""يعرّف العقد المنظم لنتيجة Query Plan وGoogleSQL المقترحة من Gemini."""
 from enum import Enum
 
 from pydantic import (

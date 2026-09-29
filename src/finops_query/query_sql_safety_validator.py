@@ -236,6 +236,11 @@ def _validate_functions(
     for function in statement.find_all(
         exp.Func
     ):
+        # SQLGlot قد يعامل AND كعقدة Func، لكنها رابط منطقي
+        # مطلوب عند وجود أكثر من Filter أو حدود زمنية.
+        if isinstance(function, exp.And):
+            continue
+
         function_name = (
             function.sql_name().upper()
         )
