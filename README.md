@@ -2,26 +2,33 @@
 
 A beginner-friendly Data and AI assistant for cloud billing analysis.
 
-The project has two clear paths:
+The project contains three focused paths:
 
-1. A data pipeline that validates, cleans, profiles, stores, and publishes billing data.
-2. A FinOps assistant that accepts an English question through a CLI or FastAPI endpoint, generates safe GoogleSQL with Gemini, executes it in BigQuery, and returns an evidence-grounded English answer.
+1. A data pipeline that validates, cleans, profiles, stores, and publishes cloud billing data.
+2. A FinOps Query assistant that converts English financial questions into validated GoogleSQL, executes them in BigQuery, and returns evidence-grounded answers.
+3. A FinOps RAG assistant that answers documentation questions using trusted PDF sources and returns the retrieved source metadata.
 
 ## Project Status
 
 The current MVP supports:
 
-- A local and BigQuery data pipeline.
+- Local and BigQuery cloud billing data processing.
 - Gemini-generated Query Plans and SQL Proposals.
-- Two Gemini calls per answered question.
-- Local validation before BigQuery execution.
-- BigQuery Dry Run and configurable execution limits.
-- Result validation and Dynamic Evidence generation.
-- Evidence-grounded final answers.
-- CLI and FastAPI interfaces using the same Assistant Core.
-- Automated tests for the data and FinOps query paths.
+- Two Gemini calls for answered financial queries.
+- Local Query Plan, SQL safety, and SQL semantic validation.
+- BigQuery Dry Run with configurable execution limits.
+- BigQuery result validation and Dynamic Evidence generation.
+- Evidence-grounded final financial answers.
+- Query access through CLI and FastAPI.
+- PDF document loading and text extraction.
+- Configurable text chunking with overlap.
+- Gemini document and question embeddings.
+- Local RAG index storage and reuse.
+- Cosine similarity retrieval.
+- Grounded RAG answers with file, page, chunk, URL, and similarity metadata.
+- Explicit insufficient-evidence responses when the documents do not support an answer.
 
-RAG over documents is not part of this version and can be added as a later project path.
+The Query and RAG paths are currently separate. Automatic routing between them is planned for a later project stage.
 
 ## Architecture
 
@@ -41,40 +48,77 @@ Raw CSV
   -> Pipeline Manifest
 ```
 
-The data path can run locally for safe verification or publish the cleaned dataset to BigQuery.
+The data path can run locally for verification or publish the cleaned dataset to BigQuery.
 
-### 2. FinOps Assistant
+### 2. FinOps Query Assistant
 
 ```text
-User Question (CLI or FastAPI)
-  -> Assistant Core
-  -> BigQuery Schema Catalog
-  -> Gemini Call 1: Query Plan + SQL Proposal
-  -> Query Plan, SQL Safety, and Semantic Validation
+User Question
+  -> CLI or FastAPI
+  -> Assistant Service
+  -> Safe BigQuery Schema Context
+  -> Gemini Call 1
+  -> Query Plan + SQL Proposal
+  -> Query Plan Validation
+  -> SQL Safety Validation
+  -> SQL Semantic Validation
+  -> BigQuery Parameters
   -> BigQuery Dry Run
   -> Optional BigQuery Execution
   -> Query Result Validation
   -> Dynamic Evidence
-  -> Gemini Call 2: Final English Answer
+  -> Gemini Call 2
   -> Final Answer Validation
-  -> CLI or API Response
+  -> CLI or FastAPI Response
 ```
 
-Gemini proposes the query and writes the final response. The backend owns validation, execution decisions, BigQuery access, and financial evidence.
+Gemini proposes the Query Plan and SQL, but the backend owns validation, execution decisions, BigQuery access, and financial evidence.
 
-## Why Two Gemini Calls?
+### 3. FinOps RAG Assistant
 
-The assistant originally used three Gemini calls:
+```text
+PDF Documents
+  -> Page Text Extraction
+  -> Text Normalization
+  -> Chunking with Source Metadata
+  -> Document Embeddings
+  -> Local RAG Index
+  -> User Question Embedding
+  -> Cosine Similarity
+  -> Top K Retrieved Chunks
+  -> Grounded Gemini Answer
+  -> Answer with Source Metadata
+```
 
-1. Generate a Query Plan.
-2. Generate an SQL Proposal.
-3. Generate the final answer.
+The complete PDF is not sent to Gemini. Only the chunks retrieved as most relevant to the user question are included in the answer prompt.
 
-The first two stages are now combined. Gemini Call 1 returns both the Query Plan and SQL Proposal in one structured response. The backend still validates both contracts before BigQuery is contacted.
+If the retrieved context does not contain enough evidence, the assistant returns an insufficient-evidence response instead of using outside knowledge.
 
-Gemini Call 2 receives only validated Dynamic Evidence and produces the final English answer.
+## Why Two Gemini Calls in the Query Path?
 
-This reduces model usage while keeping the important validation boundaries.
+The Query assistant uses two Gemini calls:
+
+1. Gemini Call 1 returns a structured Query Plan and SQL Proposal.
+2. Gemini Call 2 receives validated Dynamic Evidence and creates the final English answer.
+
+The first result is validated before BigQuery is contacted. The second call does not receive unrestricted database access or the complete table; it receives only the validated evidence needed for the answer.
+
+This design reduces model usage while preserving the important safety and grounding boundaries.
+
+## Simplified Query Architecture
+
+The Query path is organized into six focused files:
+
+| File | Responsibility |
+|---|---|
+| `models.py` | Defines the Pydantic contracts shared across the Query journey. |
+| `schema.py` | Reads the real BigQuery schema and builds a safe semantic context. |
+| `query_service.py` | Performs Gemini Call 1 and validates the Query Plan and generated SQL. |
+| `bigquery_service.py` | Binds parameters, performs Dry Run and execution, validates results, and builds Dynamic Evidence. |
+| `answer_service.py` | Performs Gemini Call 2 and validates the grounded final answer. |
+| `assistant_service.py` | Coordinates the complete Query journey and returns one shared result contract. |
+
+The CLI and FastAPI interfaces call the same Assistant Service, so the core business logic is not duplicated.
 
 ## Supported Query Capabilities
 
@@ -92,17 +136,17 @@ This reduces model usage while keeping the important validation boundaries.
 
 ### Operations
 
-- Sum, average, minimum, and maximum for supported metrics.
-- Dimension filters and supported comparison operators.
+- Sum, average, minimum, maximum, and supported count operations.
+- Dimension filters with supported comparison operators.
 - Date ranges.
 - Grouping by supported dimensions.
 - Ascending and descending sorting.
 - Result limits.
 - Clarification and unsupported-question states.
 
-The MVP supports a defined semantic scope. It does not claim to answer every possible natural-language or financial question.
+The Query assistant supports a defined semantic scope. It does not claim to answer every possible natural-language or financial question.
 
-## Safety and Grounding
+## Query Safety and Grounding
 
 Before execution, the backend checks that the generated SQL:
 
@@ -110,25 +154,47 @@ Before execution, the backend checks that the generated SQL:
 - Uses the allowed BigQuery table and physical columns.
 - Does not use DML, DDL, joins, subqueries, CTEs, window functions, or `SELECT *`.
 - Uses named parameters for user-provided values.
-- Matches the validated Query Plan.
+- Defines exactly the parameters used by SQL.
+- Matches the validated metrics, dimensions, filters, time range, sorting, and limit in the Query Plan.
+- Uses the negative-cost scope when the negative billed cost metric is requested.
 - Stays within the configured BigQuery byte limit.
 
 After execution, the backend checks that:
 
 - Returned columns match the Query Plan.
-- Row counts and values satisfy the result contract.
-- Dynamic Evidence contains the verified query result.
-- The final answer references real evidence rows and columns.
-- Financial numbers in the answer are present in the evidence or are permitted rounded representations.
+- Row counts satisfy the configured and planned limits.
+- Metric values are finite numbers or `null`.
+- Dynamic Evidence contains only the verified query result.
+- Final answer references point to real evidence rows and columns.
+- Financial numbers in the answer exist in the question or referenced evidence.
+
+## RAG Grounding
+
+The RAG path:
+
+- Reads text-based PDF documents.
+- Keeps the source filename, page number, source URL, and Chunk ID.
+- Creates document embeddings with a Gemini embedding model.
+- Stores the RAG index locally as a generated runtime artifact.
+- Converts the user question into an embedding.
+- Uses cosine similarity to retrieve the closest chunks.
+- Sends only the retrieved context to Gemini.
+- Instructs Gemini not to use outside knowledge.
+- Returns `not_found` when the context is insufficient.
+- Displays the retrieved source metadata with the answer.
+
+Scanned or image-only PDFs require OCR and are outside the current MVP.
 
 ## Project Structure
 
 ```text
 .
 ├── data/
-│   └── raw/
+│   ├── raw/
+│   ├── processed/
+│   ├── rag_documents/
+│   └── rag_index/
 ├── queries/
-│   └── bigquery/
 ├── src/
 │   ├── analytics.py
 │   ├── cleaning.py
@@ -139,45 +205,59 @@ After execution, the backend checks that:
 │   ├── pipeline_manifest.py
 │   ├── profiling.py
 │   ├── validation.py
-│   └── finops_query/
-├── tests/
+│   ├── finops_query/
+│   │   ├── models.py
+│   │   ├── schema.py
+│   │   ├── query_service.py
+│   │   ├── bigquery_service.py
+│   │   ├── answer_service.py
+│   │   └── assistant_service.py
+│   └── finops_rag/
+│       ├── document_loader.py
+│       ├── retriever.py
+│       └── rag_service.py
 ├── finops_api.py
 ├── main.py
 ├── run_cloud_pipeline.py
 ├── run_finops_query_generation_live.py
+├── run_finops_rag.py
 ├── run_queries.py
 ├── .env.example
+├── .gitignore
 └── requirements.txt
 ```
 
+PDF documents and the generated local RAG index are excluded from Git. The repository keeps the code and configuration needed to rebuild the index.
+
 ## Requirements
 
-- Python 3.11 or later is recommended.
+- Python 3.10 or later.
 - A Google Cloud project with BigQuery enabled.
-- Google Application Default Credentials or an equivalent configured BigQuery credential.
+- Google Application Default Credentials or equivalent configured BigQuery credentials.
 - A Gemini API key.
+- Text-based PDF documentation for the RAG path.
 
 ## Installation
 
-Create and activate a virtual environment:
+Create a virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-Windows:
+Activate it on Windows:
 
 ```bash
 .venv\Scripts\activate
 ```
 
-macOS or Linux:
+Activate it on macOS or Linux:
 
 ```bash
 source .venv/bin/activate
 ```
 
-Install the dependencies:
+Install the direct project dependencies:
 
 ```bash
 python -m pip install --upgrade pip
@@ -196,7 +276,7 @@ On macOS or Linux:
 cp .env.example .env
 ```
 
-Add the real Gemini key only to `.env`. Never commit `.env` or credential files.
+Add the real Gemini API key only to `.env`. Never commit `.env` or credential files.
 
 ## Environment Variables
 
@@ -207,15 +287,20 @@ Add the real Gemini key only to `.env`. Never commit `.env` or credential files.
 | `FINOPS_DATASET_ID` | BigQuery dataset | `cloud_finops` |
 | `FINOPS_TABLE_ID` | Published billing table | `billing_pipeline_day2` |
 | `BIGQUERY_LOCATION` | BigQuery location | `US` |
-| `GEMINI_MODEL` | Gemini model name | `gemini-3.5-flash-lite` |
-| `FINOPS_EXECUTE_QUERIES` | Enables real query execution | `false` or `true` |
+| `GEMINI_MODEL` | Gemini answer model | `gemini-3.5-flash-lite` |
+| `FINOPS_EXECUTE_QUERIES` | Enables real BigQuery execution | `false` or `true` |
 | `FINOPS_MAXIMUM_BYTES_BILLED` | Maximum bytes allowed per query | `104857600` |
-| `FINOPS_MAX_RESULT_ROWS` | Maximum rows accepted by the backend | `100` |
+| `FINOPS_MAX_RESULT_ROWS` | Maximum accepted result rows | `100` |
 | `FINOPS_QUERY_TIMEOUT_SECONDS` | BigQuery execution timeout | `60` |
+| `RAG_EMBEDDING_MODEL` | Gemini embedding model | `gemini-embedding-001` |
+| `RAG_TOP_K` | Number of retrieved chunks | `3` |
+| `RAG_REBUILD_INDEX` | Rebuilds the local RAG index | `false` or `true` |
 
-Keep `FINOPS_EXECUTE_QUERIES=false` when testing query generation and Dry Run only.
+Keep `FINOPS_EXECUTE_QUERIES=false` when checking Query generation and Dry Run only.
 
-Change it to `true` only when real BigQuery execution is intended.
+Set it to `true` only when real BigQuery execution is intended.
+
+Set `RAG_REBUILD_INDEX=true` after adding, removing, or changing PDF documents. After the new index is built successfully, return it to `false` to reuse the saved index.
 
 ## Running the Data Pipeline
 
@@ -225,13 +310,13 @@ Run the local data preparation path:
 python main.py
 ```
 
-Run the cloud pipeline without publishing to BigQuery:
+Run the cloud pipeline without publishing:
 
 ```bash
 python run_cloud_pipeline.py --local-only
 ```
 
-Run the cloud pipeline and publish to BigQuery:
+Run the cloud pipeline with BigQuery publishing:
 
 ```bash
 python run_cloud_pipeline.py
@@ -243,15 +328,15 @@ Run the analytical SQL files:
 python run_queries.py
 ```
 
-## Running the FinOps Assistant from the CLI
+## Running the FinOps Query CLI
 
-Set this value in `.env` when real execution is required:
+Enable real execution when required:
 
-```text
+```env
 FINOPS_EXECUTE_QUERIES=true
 ```
 
-Start the CLI:
+Run:
 
 ```bash
 python run_finops_query_generation_live.py
@@ -262,18 +347,18 @@ Then enter an English financial question.
 Example:
 
 ```text
-What are the top 5 services by billed cost for AWS?
+What was the total billed cost for AWS from September 1, 2024 to September 30, 2024?
 ```
 
 ## Running the FastAPI Interface
 
-Start the API:
+Start the server:
 
 ```bash
 python -m uvicorn finops_api:app --reload
 ```
 
-Open the interactive documentation:
+Open:
 
 ```text
 http://127.0.0.1:8000/docs
@@ -292,9 +377,55 @@ Example request:
 }
 ```
 
-The CLI and FastAPI paths both call the same Assistant Core, so the business logic is not duplicated.
+FastAPI and the Query CLI use the same Assistant Service and return the same core result contract.
 
-## Example Questions
+The current RAG path is intentionally exposed through CLI only.
+
+## Running the FinOps RAG CLI
+
+Place text-based PDF documents inside:
+
+```text
+data/rag_documents/
+```
+
+Register their official source URLs in the RAG runner configuration.
+
+When building or rebuilding the index:
+
+```env
+RAG_REBUILD_INDEX=true
+```
+
+Run:
+
+```bash
+python run_finops_rag.py
+```
+
+After a successful index build, change:
+
+```env
+RAG_REBUILD_INDEX=false
+```
+
+Future questions will reuse the saved local index.
+
+Example supported question:
+
+```text
+What is FOCUS?
+```
+
+Example question not supported by theoretical documentation:
+
+```text
+What was the total AWS billed cost in September 2024?
+```
+
+For unsupported evidence, the RAG assistant should return a `not_found` result instead of inventing an answer.
+
+## Example Query Questions
 
 ```text
 What is the total billed cost for AWS?
@@ -316,16 +447,6 @@ What is the negative billed cost for Microsoft?
 What was the total billed cost for AWS from September 1, 2024 to September 30, 2024?
 ```
 
-## Running the Tests
-
-Run the complete test suite:
-
-```bash
-python -m pytest -q
-```
-
-The tests use controlled test doubles where needed and do not require every test to call the real Gemini or BigQuery services.
-
 ## Main BigQuery Resources
 
 - Project: `data-ai-assistant-training`
@@ -337,17 +458,21 @@ The tests use controlled test doubles where needed and do not require every test
 
 ## Current Limitations
 
-- The assistant supports the declared FinOps semantic schema only.
-- Complex joins, subqueries, CTEs, and window functions are outside the MVP SQL subset.
-- Questions requiring unavailable fields or unsupported business logic return an unsupported or clarification state.
-- Model quotas and BigQuery permissions depend on the configured Google accounts and services.
-- RAG and document-question routing are planned future paths, not current features.
+- The Query assistant supports only the declared FinOps semantic schema.
+- Complex joins, subqueries, CTEs, and window functions are outside the current SQL subset.
+- Questions requiring unavailable fields or business rules return clarification or unsupported states.
+- The RAG path currently supports text-based PDF documents only.
+- Scanned PDFs require OCR, which is not part of the current MVP.
+- RAG is currently available through CLI only.
+- Automatic routing between Query and RAG is not implemented yet.
+- Tools and optional LangChain integration are planned for a later stage.
+- Gemini quotas, BigQuery permissions, and cloud costs depend on the configured Google accounts and services.
 
 ## Dataset Note
 
 The repository uses a small synthetic billing dataset for training and demonstration.
 
-It contains 1,000 rows across AWS, Microsoft, and Oracle examples and must not be treated as production financial data.
+It contains examples for AWS, Microsoft, and Oracle and must not be treated as production financial data.
 
 ## Repository Safety
 
@@ -357,6 +482,8 @@ Do not commit:
 - API keys
 - Google Cloud credential JSON files
 - Local databases
-- Generated runtime artifacts unless intentionally required for documentation
+- Local PDF documents
+- Generated RAG index files
+- Generated runtime artifacts unless intentionally required
 
 Commit `.env.example` only, with placeholder or non-secret values.

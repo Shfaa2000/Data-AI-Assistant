@@ -21,6 +21,8 @@ docs/*
 experiments/*
 *.log
 /RUN_CLOUD_PIPELINE_CHANGES.md
+data/rag_documents/*.pdf
+data/rag_index/*.json
 
 # Editors and OS
 .vscode/
