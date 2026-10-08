@@ -9,6 +9,12 @@ DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
+RAG_DOCUMENTS_DIR = (DATA_DIR/ "rag_documents")
+
+RAG_INDEX_DIR = (DATA_DIR/ "rag_index")
+
+RAG_INDEX_PATH = (RAG_INDEX_DIR/ "finops_rag_index.json")
+
 QUERIES_DIR = BASE_DIR / "queries"
 
 DOCS_DIR = BASE_DIR / "docs"
