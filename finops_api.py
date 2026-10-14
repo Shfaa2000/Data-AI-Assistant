@@ -14,6 +14,9 @@ from src.finops_query.assistant_service import (
     FinOpsAssistantResult,
     answer_finops_question,
 )
+from src.finops_assistant.service import (
+    answer_finops_assistant,
+)
 
 
 app = FastAPI(
@@ -25,8 +28,8 @@ app = FastAPI(
 logger = logging.getLogger("uvicorn.error")
 
 
-class FinOpsQueryRequest(BaseModel):
-    """شكل طلب السؤال الذي تقبله واجهة FinOps."""
+class FinOpsQuestionRequest(BaseModel):
+    """شكل سؤال FinOps الذي تقبله واجهات API."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -52,23 +55,47 @@ def health() -> dict[str, str]:
     "/finops/query",
     response_model=FinOpsAssistantResult,
 )
-def query_answer(request: FinOpsQueryRequest) -> FinOpsAssistantResult:
+def query_answer(request: FinOpsQuestionRequest) -> FinOpsAssistantResult:
     """يشغل الرحلة المشتركة ويعيد النتيجة نفسها التي يعرضها CLI."""
 
     try:
         return answer_finops_question(request.question)
     except Exception as exc:
-        logger.exception("FinOps pipeline failed")
+        logger.exception(
+            "FinOps query pipeline failed"
+        )
+
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail=(
-                f"{type(exc).__name__}: {exc}"
+                "The FinOps query could not "
+                "be completed."
             ),
         ) from exc
-    except Exception as exc:
-        logger.exception("FinOps request failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="The FinOps query could not be completed.",
-        ) from exc
 
+# تستقبل أي سؤال FinOps وتشغل
+# Router ثم المسار المناسب.
+@app.post("/finops/assistant")
+def assistant_answer(
+    request: FinOpsQuestionRequest,
+) -> dict:
+    try:
+        return answer_finops_assistant(
+            request.question
+        )
+    except Exception as exc:
+        logger.exception(
+            "Unified FinOps assistant failed"
+        )
+
+        raise HTTPException(
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            detail=(
+                "The FinOps assistant could "
+                "not complete the request."
+            ),
+        ) from exc
