@@ -1,6 +1,7 @@
 """
 يبني جوابًا موثقًا من المقاطع المسترجعة فقط，ويرجع الجواب مع قائمة المصادر المستخدمة.
 """
+
 from src.finops_rag.retriever import (
     retrieve_chunks,
 )
@@ -73,7 +74,7 @@ def answer_rag_question(
         model=answer_model_name,
         contents=prompt,
     )
-
+    # يستخرج نص الجواب فقط من كائن استجابة Gemini الكامل.
     answer = (
         response.text
         or ""
@@ -117,3 +118,4 @@ def answer_rag_question(
     "answer": answer,
     "sources": sources,
 }
+
