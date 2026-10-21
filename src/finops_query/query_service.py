@@ -150,6 +150,9 @@ TIME RANGE RULES:
   DATETIME(), CAST(), or any other function.
 - Do not use BETWEEN.
 - Do not add a time condition when time_range is null.
+- TIMESTAMP parameter values must use strict
+  ISO-8601 format, for example:
+  2024-09-01T00:00:00Z.
 
 SQL SEMANTIC RULES:
 - SQL must implement the returned Query Plan exactly.
@@ -161,6 +164,9 @@ SQL SEMANTIC RULES:
   time range, sort, value scope, and limit in the plan.
 - Do not add behavior absent from the plan.
 - A scalar aggregate with no dimensions may omit LIMIT.
+- If dimensions is not empty, SQL must include
+  LIMIT equal to plan.limit, even when the user
+  did not explicitly request a limit.
 
 FINAL CONSISTENCY CHECK:
 - Before returning, compare the Query Plan and SQL Proposal.

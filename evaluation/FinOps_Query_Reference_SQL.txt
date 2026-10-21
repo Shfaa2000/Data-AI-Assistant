@@ -1,0 +1,293 @@
+FinOps Query — Manual Reference SQL Catalog
+===========================================
+
+1) What is the total billed cost for AWS?
+
+SELECT SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS';
+
+
+2) What is the total effective cost for AWS?
+
+SELECT SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS';
+
+
+3) What is the total billed cost for Microsoft?
+
+SELECT SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Microsoft';
+
+
+4) What is the total effective cost for Microsoft?
+
+SELECT SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Microsoft';
+
+
+5) What is the total billed cost for Oracle?
+
+SELECT SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Oracle';
+
+
+6) What is the total effective cost for Oracle?
+
+SELECT SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Oracle';
+
+
+7) What is the total negative billed cost for Microsoft?
+
+SELECT SUM(BilledCost) AS negative_billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Microsoft'
+  AND BilledCost < 0;
+
+
+8) What is the total negative billed cost for each provider?
+
+SELECT
+  ProviderName AS provider,
+  SUM(BilledCost) AS negative_billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE BilledCost < 0
+GROUP BY ProviderName
+ORDER BY ProviderName;
+
+
+9) What is the total billed cost by provider?
+
+SELECT
+  ProviderName AS provider,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ProviderName
+ORDER BY ProviderName;
+
+
+10) What is the total effective cost by provider?
+
+SELECT
+  ProviderName AS provider,
+  SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ProviderName
+ORDER BY ProviderName;
+
+
+11) What is the total billed cost by service?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ServiceName
+ORDER BY ServiceName;
+
+
+12) What is the total effective cost by service?
+
+SELECT
+  ServiceName AS service,
+  SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ServiceName
+ORDER BY ServiceName;
+
+
+13) What is the billed cost by service for AWS?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS'
+GROUP BY ServiceName
+ORDER BY ServiceName;
+
+
+14) What is the effective cost by service for Microsoft?
+
+SELECT
+  ServiceName AS service,
+  SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Microsoft'
+GROUP BY ServiceName
+ORDER BY ServiceName;
+
+
+15) What is the total billed cost by currency?
+
+SELECT
+  BillingCurrency AS currency,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY BillingCurrency
+ORDER BY BillingCurrency;
+
+
+16) What is the total effective cost by currency?
+
+SELECT
+  BillingCurrency AS currency,
+  SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY BillingCurrency
+ORDER BY BillingCurrency;
+
+
+17) What are the top 5 services by billed cost for AWS?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS'
+GROUP BY ServiceName
+ORDER BY billed_cost DESC
+LIMIT 5;
+
+
+18) What are the top 3 services by effective cost for Microsoft?
+
+SELECT
+  ServiceName AS service,
+  SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Microsoft'
+GROUP BY ServiceName
+ORDER BY effective_cost DESC
+LIMIT 3;
+
+
+19) What are the top 2 providers by billed cost?
+
+SELECT
+  ProviderName AS provider,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ProviderName
+ORDER BY billed_cost DESC
+LIMIT 2;
+
+
+20) What are the bottom 5 AWS services by billed cost?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS'
+GROUP BY ServiceName
+ORDER BY billed_cost ASC
+LIMIT 5;
+
+
+21) Which service has the highest billed cost?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ServiceName
+ORDER BY billed_cost DESC
+LIMIT 1;
+
+
+22) Which service has the lowest billed cost?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ServiceName
+ORDER BY billed_cost ASC
+LIMIT 1;
+
+
+23) What is the average billed cost for AWS?
+
+SELECT AVG(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS';
+
+
+24) What is the maximum billed cost by provider?
+
+SELECT
+  ProviderName AS provider,
+  MAX(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ProviderName
+ORDER BY ProviderName;
+
+
+25) What is the minimum effective cost by provider?
+
+SELECT
+  ProviderName AS provider,
+  MIN(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+GROUP BY ProviderName
+ORDER BY ProviderName;
+
+
+26) What was the total billed cost for AWS from September 1, 2024 to September 30, 2024?
+
+SELECT SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS'
+  AND DATE(BillingPeriodStart) >= DATE '2024-09-01'
+  AND DATE(BillingPeriodStart) < DATE '2024-10-01';
+
+
+27) What was the total effective cost for Microsoft from September 1, 2024 to September 30, 2024?
+
+SELECT SUM(EffectiveCost) AS effective_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'Microsoft'
+  AND DATE(BillingPeriodStart) >= DATE '2024-09-01'
+  AND DATE(BillingPeriodStart) < DATE '2024-10-01';
+
+
+28) What was the AWS billed cost by service from September 1, 2024 to September 30, 2024?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS'
+  AND DATE(BillingPeriodStart) >= DATE '2024-09-01'
+  AND DATE(BillingPeriodStart) < DATE '2024-10-01'
+GROUP BY ServiceName
+ORDER BY ServiceName;
+
+
+29) What were the top 5 AWS services by billed cost from September 1, 2024 to September 30, 2024?
+
+SELECT
+  ServiceName AS service,
+  SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE ProviderName = 'AWS'
+  AND DATE(BillingPeriodStart) >= DATE '2024-09-01'
+  AND DATE(BillingPeriodStart) < DATE '2024-10-01'
+GROUP BY ServiceName
+ORDER BY billed_cost DESC
+LIMIT 5;
+
+
+30) What is the total billed cost in USD?
+
+SELECT SUM(BilledCost) AS billed_cost
+FROM `data-ai-assistant-training.cloud_finops.billing_pipeline_day2`
+WHERE BillingCurrency = 'USD';
+

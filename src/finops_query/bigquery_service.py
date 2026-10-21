@@ -44,8 +44,8 @@ def _text(
         )
     )
 
-
-# نحوّل القيمة إلى كائن Python المناسب الذي تستطيع مكتبة BigQuery تحويله إلى نوع BigQuery الصحيح.
+# يحول قيمة Parameter النصية إلى نوع Python
+# المناسب الذي تستطيع BigQuery استخدامه.
 def _coerce_parameter_value(
     data_type: str,
     value: Any,
@@ -59,7 +59,8 @@ def _coerce_parameter_value(
             bool,
         ):
             raise BigQueryServiceError(
-                "BOOL cannot be used as INT64."
+                "BOOL cannot be used "
+                "as INT64."
             )
 
         return int(value)
@@ -92,9 +93,16 @@ def _coerce_parameter_value(
         ):
             return value
 
-        return date.fromisoformat(
-            str(value)
-        )
+        try:
+            return date.fromisoformat(
+                str(value).strip()
+            )
+
+        except ValueError as exc:
+            raise BigQueryServiceError(
+                "Invalid DATE parameter "
+                f"value: {value!r}."
+            ) from exc
 
     if data_type == "TIMESTAMP":
         if isinstance(
@@ -104,15 +112,47 @@ def _coerce_parameter_value(
             parsed_value = value
 
         else:
-            parsed_value = (
-                datetime.fromisoformat(
-                    str(value).replace(
-                        "Z",
-                        "+00:00",
+            timestamp_text = str(
+                value
+            ).strip()
+
+            # يحول صيغة مثل:
+            # 2024-09-01 00:00:00 UTC
+            # إلى صيغة ISO تقبلها Python.
+            if timestamp_text.upper().endswith(
+                " UTC"
+            ):
+                timestamp_text = (
+                    timestamp_text[:-4]
+                    + "+00:00"
+                )
+
+            # يحول صيغة ISO التي تنتهي بـ Z
+            # إلى UTC Offset تقبله Python 3.10.
+            elif timestamp_text.endswith(
+                "Z"
+            ):
+                timestamp_text = (
+                    timestamp_text[:-1]
+                    + "+00:00"
+                )
+
+            try:
+                parsed_value = (
+                    datetime.fromisoformat(
+                        timestamp_text
                     )
                 )
-            )
 
+            except ValueError as exc:
+                raise BigQueryServiceError(
+                    "Invalid TIMESTAMP "
+                    "parameter value: "
+                    f"{value!r}."
+                ) from exc
+
+        # إذا لم تحتوِ القيمة على Timezone،
+        # نعاملها كتوقيت UTC.
         if parsed_value.tzinfo is None:
             parsed_value = (
                 parsed_value.replace(
@@ -126,7 +166,6 @@ def _coerce_parameter_value(
         "Unsupported parameter type: "
         f"{data_type}"
     )
-
 
 # يحول Parameters المقترحة إلى قيم typed ويربطها بأسماء
 # يمكن لـBigQuery استخدامها بأمان عند تنفيذ SQL.

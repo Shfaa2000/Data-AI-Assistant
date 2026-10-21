@@ -1,0 +1,98 @@
+FinOps Router and RAG Evaluation Questions
+==========================================
+
+Section 1 — Supported RAG Questions
+Expected route: rag
+Expected status: answered
+Expected evidence: relevant PDF pages and chunks
+
+1. What is FOCUS?
+2. What is the main purpose of FOCUS?
+3. How does FOCUS normalize cloud billing data?
+4. What common taxonomy does FOCUS provide?
+5. What types of technology billing data does FOCUS cover?
+6. How does FOCUS reduce complexity for FinOps practitioners?
+7. How does FOCUS make FinOps skills more portable?
+8. Who contributes to the development of FOCUS?
+9. What does FinOps with Azure mean?
+10. Why is organizational alignment important for FinOps with Azure?
+11. Why is cultural alignment important when implementing FinOps?
+12. How can teams collaborate when adopting FinOps with Azure?
+13. What is shared services cost allocation in cloud FinOps?
+14. Why should shared cloud service costs be allocated?
+15. What challenges are associated with shared services cost allocation?
+
+
+Section 2 — Financial Questions Unsupported by the Current Query Contract
+Expected final status: unsupported
+Expected BigQuery execution: skipped
+
+1. What is the total billed cost by region?
+2. What is the total cost by resource name?
+3. What is the total cost by project ID?
+4. Show the billed cost for each invoice ID.
+5. Forecast the total cloud cost for next month.
+6. Compare the actual cost with the annual budget.
+7. Delete all negative cost records.
+8. Join the billing table with a commitment discounts table.
+9. What is the monthly cost trend for the last twelve months?
+10. Create a chart showing cost by availability zone.
+
+Note: A financial question may first route to query and then return
+unsupported after the Query Plan checks the available schema. This is
+acceptable as long as no SQL is executed.
+
+
+Section 3 — Questions Outside the Available RAG Documents
+Expected unified route/status: unsupported, unless noted otherwise
+Expected RAG-only status: not_found
+
+1. What is the current AWS EC2 price today?
+2. How many rows exist in the BigQuery billing table?
+3. Who is the current CEO of Microsoft?
+4. What is the latest Kubernetes version?
+5. How do I write a Python list comprehension?
+6. What is tomorrow's weather in Damascus?
+7. What is the current exchange rate between USD and EUR?
+8. What medical treatment should be used for a headache?
+
+Note: The row-count question is financial-data related but is unsupported
+by the current semantic Query contract. It may route to query and end with
+unsupported without executing BigQuery.
+
+
+Section 4 — Clarification Questions
+Expected route/status: needs_clarification
+Expected BigQuery and RAG execution: skipped
+
+1. What is the cost?
+2. Show me the cloud costs.
+3. Which provider is better?
+4. Which service is expensive?
+
+
+Section 5 — Router Variations for Existing Supported Questions
+These variations test routing only. Their reference SQL already exists in
+FinOps_Query_Reference_SQL.txt, so it is not repeated here.
+
+1. Give me AWS total billed cost.
+2. Show Microsoft effective cloud cost.
+3. List the five most expensive AWS services.
+4. How much did AWS cost during September 2024?
+5. Explain FOCUS in simple words.
+6. Why do FinOps teams allocate shared-service costs?
+
+
+تعليمات الاستخدام
+-----------------
+
+1. أسئلة القسم الأول يجب أن تذهب إلى RAG وتعود بجواب موثق من ملفات PDF.
+2. أسئلة القسم الثاني غير مدعومة بالعقد المالي الحالي، لذلك لا تحتاج SQL مرجعية.
+3. عند تشغيل أسئلة القسم الثالث على RAG وحده، الحالة المتوقعة هي not_found.
+4. عند تشغيلها على المسار الموحد، يجب أن يمنعها Router أو تنتهي unsupported.
+5. أسئلة القسم الرابع يجب أن توقف الرحلة وتطلب توضيحًا من المستخدم.
+6. القسم الخامس يختبر قدرة Router وGemini على فهم صياغات مختلفة للسؤال نفسه.
+7. لا نعتبر السؤال فاشلًا لمجرد أن Route كانت query ثم أصبحت الحالة unsupported؛
+   المهم أن السبب صحيح وألا يتم تنفيذ SQL لسؤال خارج العقد.
+8. لا توجد أسئلة مالية مدعومة مكررة هنا؛ SQL المرجعية لها موجودة في الملف الآخر.
+

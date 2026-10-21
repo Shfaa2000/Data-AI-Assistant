@@ -93,7 +93,14 @@ def run_query_tool(
 
     sources = []
     # يضيف جدول BigQuery وموقعه كمصدر للجواب المالي.
-    if result.allowed_table:
+    if (
+        result.allowed_table
+        and result_status
+        not in {
+            "unsupported",
+            "needs_clarification",
+        }
+    ):
         sources.append(
             {
                 "source_type": "bigquery",
